@@ -245,8 +245,20 @@ export default function TicketsPage({ tickets = [], loading }) {
                 </tr>
               ) : (
                 paginatedTickets.map((ticket, idx) => {
-                  // Blocked >3 days highlight
-                  const highlight = ticket.currentBlockDurationHours > 72;
+                  // Blocked >3 days highlight - only for currently blocked tickets
+                  const isCurrentlyBlocked = ticket.status === 'Blocked';
+                  const highlight = isCurrentlyBlocked && ticket.currentBlockDurationHours && ticket.currentBlockDurationHours > 72;
+                  
+                  // Debug logging for tickets with warning emoji
+                  if (highlight) {
+                    console.log('Ticket with warning:', {
+                      id: ticket.id,
+                      status: ticket.status,
+                      isBlocked: ticket.isBlocked,
+                      currentBlockDurationHours: ticket.currentBlockDurationHours
+                    });
+                  }
+                  
                   return (
                     <tr
                       key={ticket.id}
@@ -267,7 +279,7 @@ export default function TicketsPage({ tickets = [], loading }) {
                       <td className="px-4 py-2">{typeof ticket.calculatedTotalTimeInDevHours === 'number' ? ticket.calculatedTotalTimeInDevHours + 'h' : '-'}</td>
                       <td className="px-4 py-2 flex items-center gap-2">
                         {typeof ticket.calculatedTotalTimeBlockedHours === 'number' ? ticket.calculatedTotalTimeBlockedHours + 'h' : '-'}
-                        {highlight && <span title="Blocked > 3 days" className="text-red-600">\u26a0\ufe0f</span>}
+                        {highlight && <span title="Currently blocked > 3 days" className="text-red-600">⚠️</span>}
                       </td>
                     </tr>
                   );
