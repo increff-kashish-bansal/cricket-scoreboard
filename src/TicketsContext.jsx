@@ -42,9 +42,15 @@ export function TicketsProvider({ children }) {
         ticket.dataIssues.push('Invalid JSON in Event_Log');
         console.error('Invalid JSON in Event_Log:', ticket.Event_Log, ticket, e);
       }
-      eventLogParsed = eventLogParsed.map(ev => {
+      // Refine event log for Gantt: ensure official block/unblock timestamps and consistent user attribution
+      eventLogParsed = eventLogParsed.map((ev, idx, arr) => {
         let ts = null;
-        if (ev.timestamp) {
+        // For blocked/unblocked events, prioritize ticket fields if present
+        if (ev.status === 'Blocked' && ticket.Blocked_Since_Date) {
+          ts = ticket.Blocked_Since_Date;
+        } else if ((ev.status === 'Unblocked' || ev.status === 'In Progress') && ticket.Unblocked_At_Date) {
+          ts = ticket.Unblocked_At_Date;
+        } else if (ev.timestamp) {
           ts = new Date(ev.timestamp);
           if (isNaN(ts)) {
             ticket.dataIssues.push(`Invalid eventLog timestamp: ${ev.timestamp}`);
@@ -52,9 +58,77 @@ export function TicketsProvider({ children }) {
             ts = null;
           }
         }
-        return { ...ev, timestamp: ts };
+        // Consistent user attribution
+        let user = ev.user || ev.by || ev.owner;
+        if (!user) {
+          if (ev.status === 'Blocked') user = ticket.blockedBy || ticket.owner || '?';
+          else user = ticket.owner || '?';
+        }
+        // For blocked events, also ensure blockedBy is set
+        let blockedBy = ev.blockedBy || (ev.status === 'Blocked' ? (ticket.blockedBy || user) : undefined);
+        return { ...ev, timestamp: ts, user, blockedBy };
       }).filter(ev => ev.timestamp instanceof Date && !isNaN(ev.timestamp));
+      // Validate that at least one blocked/unblocked event matches ticket fields
+      if (ticket.Blocked_Since_Date) {
+        const hasBlocked = eventLogParsed.some(ev => ev.status === 'Blocked' && ev.timestamp.getTime() === ticket.Blocked_Since_Date.getTime());
+        if (!hasBlocked) {
+          // Insert a synthetic blocked event if missing
+          eventLogParsed.push({
+            status: 'Blocked',
+            timestamp: ticket.Blocked_Since_Date,
+            user: ticket.blockedBy || ticket.owner || '?',
+            blockedBy: ticket.blockedBy || ticket.owner || '?',
+            note: '[Synthesized from Blocked_Since_Date]'
+          });
+        }
+      }
+      if (ticket.Unblocked_At_Date) {
+        const hasUnblocked = eventLogParsed.some(ev => (ev.status === 'Unblocked' || ev.status === 'In Progress') && ev.timestamp.getTime() === ticket.Unblocked_At_Date.getTime());
+        if (!hasUnblocked) {
+          // Insert a synthetic unblocked event if missing
+          eventLogParsed.push({
+            status: 'Unblocked',
+            timestamp: ticket.Unblocked_At_Date,
+            user: ticket.owner || '?',
+            note: '[Synthesized from Unblocked_At_Date]'
+          });
+        }
+      }
       eventLogParsed.sort((a, b) => a.timestamp - b.timestamp);
+      // Data consistency checks for Gantt
+      // 1. Check for strictly chronological eventLogParsed
+      for (let i = 1; i < eventLogParsed.length; i++) {
+        if (eventLogParsed[i].timestamp < eventLogParsed[i - 1].timestamp) {
+          ticket.dataIssues.push('Event_Log is not strictly chronological');
+          console.error('Event_Log is not strictly chronological:', ticket.id, eventLogParsed);
+          break;
+        }
+      }
+      // 2. Check that every Blocked is followed by Unblocked/In Progress (unless currently blocked)
+      for (let i = 0; i < eventLogParsed.length; i++) {
+        const ev = eventLogParsed[i];
+        if (ev.status === 'Blocked') {
+          let foundUnblock = false;
+          for (let j = i + 1; j < eventLogParsed.length; j++) {
+            if (['Unblocked', 'In Progress'].includes(eventLogParsed[j].status)) {
+              foundUnblock = true;
+              break;
+            }
+            if (eventLogParsed[j].status === 'Blocked') break; // Next block starts, so this block is not closed
+          }
+          if (!foundUnblock && !ticket.isBlocked) {
+            ticket.dataIssues.push('Blocked event not followed by Unblocked/In Progress');
+            console.error('Blocked event not followed by Unblocked/In Progress:', ticket.id, eventLogParsed);
+          }
+        }
+      }
+      // 3. (Optional) Status consistency check
+      for (let i = 1; i < eventLogParsed.length; i++) {
+        if (eventLogParsed[i].status && eventLogParsed[i-1].status && eventLogParsed[i].status === eventLogParsed[i-1].status) {
+          ticket.dataIssues.push(`Duplicate status at index ${i}: ${eventLogParsed[i].status}`);
+          console.warn('Duplicate status in Event_Log:', ticket.id, eventLogParsed[i]);
+        }
+      }
       ticket.eventLogParsed = eventLogParsed;
 
       // --- 2.3 Calculate Comprehensive Ticket Durations ---

@@ -265,8 +265,9 @@ export default function TicketsPage({ tickets = [], loading }) {
                       className={`border-t border-neutral-200 hover:bg-neutral-100 ${idx % 2 === 1 ? 'even:bg-neutral-50' : ''} ${highlight ? 'bg-red-100' : ''}`}
                     >
                       <td className="px-4 py-2 font-mono">
-                        <Link to={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline">
+                        <Link to={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline flex items-center gap-1" title="View Timeline" aria-label="View Timeline">
                           {ticket.id}
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5V3m-8 8v6a2 2 0 002 2h4a2 2 0 002-2v-6" /></svg>
                         </Link>
                       </td>
                       <td className="px-4 py-2">{ticket.title}</td>

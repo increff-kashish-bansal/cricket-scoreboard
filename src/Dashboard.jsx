@@ -93,7 +93,7 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Dashboard</h1>
       {loading ? (
         <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
           <ArrowPathIcon className="h-10 w-10 animate-spin mb-2" />
@@ -167,7 +167,7 @@ function Dashboard() {
           {/* Velocity Chart Card */}
           <div className="bg-white rounded-xl shadow-md p-8 border border-neutral-200 mt-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-semibold">Developer Velocity (per Sprint)</h2>
+              <h2 className="text-xl font-semibold text-neutral-700 mb-4">Developer Velocity (per Sprint)</h2>
               <div className="flex gap-2">
                 <button
                   className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${velocityMode === 'tickets' ? 'border-primary text-primary bg-white' : 'border-transparent text-neutral-500 bg-neutral-100'}`}

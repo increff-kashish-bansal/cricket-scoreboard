@@ -191,9 +191,12 @@ export default function BlockersPage({ tickets = [], loading }) {
   // --- SPRINTS ---
   const allSprints = Array.from(new Set(ticketsToUse.map(t => t.sprint || "No Sprint")));
 
+  // --- SUMMARY METRICS ---
+  const totalTicketsBlocked = Object.values(blockerStats).reduce((acc, b) => acc + b.ticketIds.size, 0);
+
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Blocker Dashboard</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Blocker Dashboard</h1>
       {loadingToUse ? (
         <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
           <ArrowPathIcon className="h-10 w-10 animate-spin mb-2" />
@@ -201,63 +204,27 @@ export default function BlockersPage({ tickets = [], loading }) {
         </div>
       ) : (
         <>
+          {/* SUMMARY CARDS */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
+            <div className="flex flex-col items-center gap-2 bg-white rounded-xl shadow-md p-6 border border-neutral-200">
+              <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Total Blocked Time</div>
+              <div className="text-3xl font-bold text-neutral-800">{totalBlockedHours}h</div>
+            </div>
+            <div className="flex flex-col items-center gap-2 bg-white rounded-xl shadow-md p-6 border border-neutral-200">
+              <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Total Tickets Blocked</div>
+              <div className="text-3xl font-bold text-neutral-800">{totalTicketsBlocked}</div>
+            </div>
+          </div>
           <div className="mb-8 bg-white rounded shadow p-4">
             <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-              <h2 className="text-lg font-semibold mb-4">% of Total Blocked Time by Entity</h2>
-              {pieData.length === 0 ? (
+              <h2 className="text-xl font-semibold text-neutral-700 mb-4">Blockers by {barMode === 'time' ? 'Total Blocked Time' : '# Tickets Blocked'}</h2>
+              {barData.length === 0 ? (
                 <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
                   <InformationCircleIcon className="h-10 w-10 mb-2" />
                   <div>No blocker data available.</div>
                 </div>
               ) : (
-                <div className="w-full h-72">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        dataKey="value"
-                        nameKey="name"
-                        cx="50%"
-                        cy="50%"
-                        outerRadius={100}
-                        label
-                        onClick={handlePieClick}
-                        isAnimationActive={false}
-                      >
-                        {pieData.map((entry, idx) => (
-                          <Cell
-                            key={`cell-${idx}`}
-                            fill={["#22c55e", "#f87171", "#fbbf24", "#60a5fa", "#a3e635", "#818cf8", "#f472b6", "#facc15"][idx % 8]}
-                            stroke={selectedBlocker === entry.name ? "#222" : undefined}
-                            strokeWidth={selectedBlocker === entry.name ? 4 : 1}
-                            cursor="pointer"
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            const { name, value } = payload[0].payload;
-                            const percent = totalBlockedHours ? ((value / totalBlockedHours) * 100).toFixed(1) : 0;
-                            return (
-                              <div className="bg-neutral-100 border border-neutral-300 rounded shadow-md p-3 text-neutral-700 text-sm">
-                                <div className="font-semibold">{name}</div>
-                                <div>Total Blocked: <span className="font-mono">{value}h</span></div>
-                                <div>Share: <span className="font-mono">{percent}%</span></div>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Legend wrapperStyle={{ color: '#52525b' }} iconType="circle" />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-              {/* Bar Chart Toggle & Chart */}
-              {pieData.length > 0 && (
-                <div className="mt-8">
+                <>
                   <div className="flex items-center gap-4 mb-2">
                     <span className="font-semibold text-sm">Compare Blockers by:</span>
                     <button
@@ -278,7 +245,7 @@ export default function BlockersPage({ tickets = [], loading }) {
                       <BarChart
                         data={barData}
                         layout="vertical"
-                        margin={{ left: 48, right: 24, top: 24, bottom: 24 }}
+                        margin={{ left: 120, right: 24, top: 24, bottom: 24 }}
                       >
                         <CartesianGrid strokeDasharray="3 3" stroke={"#e5e7eb"} />
                         <XAxis
@@ -289,18 +256,19 @@ export default function BlockersPage({ tickets = [], loading }) {
                             position: "insideBottomRight",
                             offset: -5,
                           }}
-                          tickLine={{ stroke: '#9ca3af' }}
-                          axisLine={{ stroke: '#9ca3af' }}
+                          tickLine={{ stroke: '#a3a3a3' }}
+                          axisLine={{ stroke: '#a3a3a3' }}
                         />
                         <YAxis
                           dataKey="name"
                           type="category"
-                          width={100}
-                          tickLine={{ stroke: '#9ca3af' }}
-                          axisLine={{ stroke: '#9ca3af' }}
+                          width={120}
+                          tickLine={{ stroke: '#a3a3a3' }}
+                          axisLine={{ stroke: '#a3a3a3' }}
+                          tick={{ className: 'text-neutral-700 text-sm' }}
                         />
                         <Tooltip
-                          contentStyle={{ background: '#f5f5f5', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
+                          contentStyle={{ background: '#f5f5f5', border: '1px solid #d4d4d4', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
                           wrapperClassName="!z-50"
                           labelClassName="text-neutral-700"
                           itemStyle={{ color: '#374151' }}
@@ -313,14 +281,14 @@ export default function BlockersPage({ tickets = [], loading }) {
                         <Legend wrapperStyle={{ color: '#52525b' }} iconType="circle" />
                         <Bar
                           dataKey={barMode === "time" ? "value" : "count"}
-                          fill="#22c55e"
+                          fill={barMode === "time" ? "#22c55e" : "#3b82f6"}
                           name={barMode === "time" ? "Total Blocked Time (h)" : "# Tickets Blocked"}
                           radius={[4, 4, 4, 4]}
                         />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                </div>
+                </>
               )}
               {selectedBlocker && (
                 <div className="mt-2 flex items-center gap-2">
@@ -364,13 +332,13 @@ export default function BlockersPage({ tickets = [], loading }) {
                 </div>
               </div>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-semibold">Blocker Table</h2>
+                <h2 className="text-xl font-semibold text-neutral-700">Blocker Table</h2>
                 <button onClick={handleExport} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Export CSV</button>
               </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full text-sm">
                   <thead>
-                    <tr className="bg-gray-100 text-left">
+                    <tr className="bg-neutral-100 text-left">
                       <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("entity")}>Blocker Entity {sortConfig.key === "entity" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
                       <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("count")}># Tickets Blocked {sortConfig.key === "count" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
                       <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("totalHours")}>Total Time Blocked (h) {sortConfig.key === "totalHours" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
@@ -391,7 +359,7 @@ export default function BlockersPage({ tickets = [], loading }) {
                       </tr>
                     ) : (
                       tableData.map(b => (
-                        <tr key={b.entity} className="border-t hover:bg-gray-50">
+                        <tr key={b.entity} className="border-t hover:bg-neutral-50">
                           <td className="px-4 py-2 font-mono flex items-center gap-2">
                             {b.entity}
                             {b.repeatOffender && (

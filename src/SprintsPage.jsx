@@ -166,7 +166,7 @@ export default function SprintsPage({ tickets = [], loading }) {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Sprints</h1>
+      <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Sprints</h1>
       {/* Sprint Filter & Search */}
       <div className="bg-neutral-100 rounded-lg shadow-sm p-4 mb-6">
         <div className="flex flex-wrap gap-4 items-end">
@@ -198,7 +198,7 @@ export default function SprintsPage({ tickets = [], loading }) {
       {/* Stacked Bar Chart */}
       <div className="mb-8 bg-white rounded shadow p-4">
         <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Sprint Progress</h2>
+          <h2 className="text-xl font-semibold text-neutral-700 mb-4">Sprint Progress</h2>
           <div className="w-full h-64">
             <ResponsiveContainer>
               <BarChart

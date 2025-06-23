@@ -207,7 +207,7 @@ export default function PeoplePage({ tickets = [], loading }) {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-neutral-800 mb-0">People Dashboard</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">People Dashboard</h1>
         <button onClick={handleExport} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Export CSV</button>
       </div>
       <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
