@@ -197,14 +197,7 @@ function App() {
           <div className="max-w-7xl mx-auto px-4">
             <SidebarNav />
             <div className="min-h-[60vh] bg-white rounded shadow p-6 mb-8 animate-fadein">
-              <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/tickets" element={<TicketsPage />} />
-                <Route path="/tickets/:id" element={<TicketDetailPage />} />
-                <Route path="/blockers" element={<BlockersPage />} />
-                <Route path="/sprints" element={<SprintsPage />} />
-                <Route path="/people" element={<PeoplePage />} />
-              </Routes>
+              <AppRoutes />
             </div>
           </div>
         </Router>

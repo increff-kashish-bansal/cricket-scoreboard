@@ -65,6 +65,8 @@ const statusPillClass = status => {
 };
 
 export default function TicketsPage({ tickets = [], loading }) {
+  console.log('TicketsPage received:', { ticketsCount: tickets.length, loading, tickets: tickets.slice(0, 3) });
+  
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
