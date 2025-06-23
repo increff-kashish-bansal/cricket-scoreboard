@@ -1,12 +1,66 @@
 {
   "routes": [
     {
+      "route": "/tickets.csv",
+      "headers": {
+        "Content-Type": "text/csv"
+      }
+    },
+    {
+      "route": "/*.csv",
+      "headers": {
+        "Content-Type": "text/csv"
+      }
+    },
+    {
+      "route": "/assets/*",
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
+      "route": "/*.js",
+      "headers": {
+        "Content-Type": "application/javascript"
+      }
+    },
+    {
+      "route": "/*.css",
+      "headers": {
+        "Content-Type": "text/css"
+      }
+    },
+    {
+      "route": "/*.html",
+      "headers": {
+        "Content-Type": "text/html"
+      }
+    },
+    {
+      "route": "/*.json",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    },
+    {
       "route": "/*",
-      "rewrite": "/index.html"
+      "rewrite": "/index.html",
+      "headers": {
+        "Content-Type": "text/html"
+      }
     }
   ],
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/js/*", "/api/*", "*.{css,js,png,jpg,gif,ico,svg}"]
+    "exclude": ["/images/*.{png,jpg,gif}", "/css/*", "/js/*", "/api/*", "*.{css,js,png,jpg,gif,ico,svg,csv}"]
+  },
+  "responseOverrides": {
+    "404": {
+      "rewrite": "/index.html",
+      "statusCode": 200
+    }
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff"
   }
 } 
