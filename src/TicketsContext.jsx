@@ -1,7 +1,7 @@
 import React from "react";
 import { createContext, useContext, useState, useCallback } from "react";
 import Papa from "papaparse";
-import { parseDurationStringToHours, formatHoursToDuration, formatDate, validateTicket } from './utils.js';
+import { parseDurationStringToHours, formatHoursToDuration, formatDate, validateTicket, calculateWorkingHours } from './utils.js';
 import toast from 'react-hot-toast';
 
 const TicketsContext = createContext();
@@ -58,42 +58,44 @@ export function TicketsProvider({ children }) {
       ticket.eventLogParsed = eventLogParsed;
 
       // --- 2.3 Calculate Comprehensive Ticket Durations ---
-      let totalTimeBlockedMs = 0, totalTimeInDevMs = 0, totalTimeInReviewMs = 0, totalTimeInQAMs = 0;
+      let totalTimeBlockedH = 0, totalTimeInDevH = 0, totalTimeInReviewH = 0, totalTimeInQAH = 0;
       let lastStatus = null, lastTimestamp = null;
       const now = new Date();
       for (let i = 0; i < eventLogParsed.length; i++) {
         const ev = eventLogParsed[i];
         if (lastStatus && lastTimestamp) {
-          const durationMs = ev.timestamp - lastTimestamp;
-          if (lastStatus === 'Blocked') totalTimeBlockedMs += durationMs;
-          if (lastStatus === 'In Progress') totalTimeInDevMs += durationMs;
-          if (lastStatus === 'In Review') totalTimeInReviewMs += durationMs;
-          if (lastStatus === 'QA') totalTimeInQAMs += durationMs;
+          if (ev.timestamp > lastTimestamp) {
+            const calcH = calculateWorkingHours(lastTimestamp, ev.timestamp);
+            if (lastStatus === 'Blocked') totalTimeBlockedH += calcH;
+            if (lastStatus === 'In Progress') totalTimeInDevH += calcH;
+            if (lastStatus === 'In Review') totalTimeInReviewH += calcH;
+            if (lastStatus === 'QA') totalTimeInQAH += calcH;
+          }
         }
         lastStatus = ev.status;
         lastTimestamp = ev.timestamp;
       }
       // If not done, add time from last event to now
       if (lastStatus && lastTimestamp && ticket.status !== 'Done' && ticket.status !== 'Deployed') {
-        const durationMs = now - lastTimestamp;
-        if (lastStatus === 'Blocked') totalTimeBlockedMs += durationMs;
-        if (lastStatus === 'In Progress') totalTimeInDevMs += durationMs;
-        if (lastStatus === 'In Review') totalTimeInReviewMs += durationMs;
-        if (lastStatus === 'QA') totalTimeInQAMs += durationMs;
+        const calcH = calculateWorkingHours(lastTimestamp, now);
+        if (lastStatus === 'Blocked') totalTimeBlockedH += calcH;
+        if (lastStatus === 'In Progress') totalTimeInDevH += calcH;
+        if (lastStatus === 'In Review') totalTimeInReviewH += calcH;
+        if (lastStatus === 'QA') totalTimeInQAH += calcH;
       }
-      ticket.calculatedTotalTimeBlockedHours = Math.round(totalTimeBlockedMs / 36e5);
-      ticket.calculatedTotalTimeInDevHours = Math.round(totalTimeInDevMs / 36e5);
-      ticket.calculatedTotalTimeInReviewHours = Math.round(totalTimeInReviewMs / 36e5);
-      ticket.calculatedTotalTimeInQAHours = Math.round(totalTimeInQAMs / 36e5);
+      ticket.calculatedTotalTimeBlockedHours = Math.round(totalTimeBlockedH);
+      ticket.calculatedTotalTimeInDevHours = Math.round(totalTimeInDevH);
+      ticket.calculatedTotalTimeInReviewHours = Math.round(totalTimeInReviewH);
+      ticket.calculatedTotalTimeInQAHours = Math.round(totalTimeInQAH);
       // Total cycle time
       if (ticket.Created_On_Date && ticket.Resolved_At_Date) {
-        ticket.totalCycleTimeHours = Math.round((ticket.Resolved_At_Date - ticket.Created_On_Date) / 36e5);
+        ticket.totalCycleTimeHours = Math.round(calculateWorkingHours(ticket.Created_On_Date, ticket.Resolved_At_Date));
       } else {
         ticket.totalCycleTimeHours = null;
       }
       // Current block duration
       if (ticket.isBlocked && ticket.Blocked_Since_Date) {
-        ticket.currentBlockDurationHours = Math.round((now - ticket.Blocked_Since_Date) / 36e5);
+        ticket.currentBlockDurationHours = Math.round(calculateWorkingHours(ticket.Blocked_Since_Date, now));
       } else {
         ticket.currentBlockDurationHours = null;
       }

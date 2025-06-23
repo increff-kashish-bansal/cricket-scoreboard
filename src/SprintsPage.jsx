@@ -121,6 +121,33 @@ export default function SprintsPage({ tickets = [], loading }) {
     };
   });
 
+  // FIX: Precompute sorted tickets for all sprints in a single useMemo
+  const sortedTicketsBySprint = useMemo(() => {
+    const result = {};
+    for (const sprint of sprintNames) {
+      let arr = [...sprints[sprint]];
+      if (expandedSprint === sprint && ticketSort.key) {
+        arr.sort((a, b) => {
+          let aVal = a[ticketSort.key];
+          let bVal = b[ticketSort.key];
+          if (ticketSort.key === "timeBlocked") {
+            aVal = parseTimeBlocked(aVal);
+            bVal = parseTimeBlocked(bVal);
+          }
+          if (typeof aVal === "number" && typeof bVal === "number") {
+            return ticketSort.direction === "asc" ? aVal - bVal : bVal - aVal;
+          } else {
+            return ticketSort.direction === "asc"
+              ? (aVal || "").toString().localeCompare((bVal || "").toString())
+              : (bVal || "").toString().localeCompare((aVal || "").toString());
+          }
+        });
+      }
+      result[sprint] = arr;
+    }
+    return result;
+  }, [sprints, sprintNames, expandedSprint, ticketSort]);
+
   function handleExport(sprintTickets) {
     const csv = toCSV(sprintTickets);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
@@ -273,28 +300,8 @@ export default function SprintsPage({ tickets = [], loading }) {
             sprintNames.map(sprint => {
               const sprintTickets = sprints[sprint];
               const stats = getSprintStats(sprintTickets);
-              // Ticket Table Sorting
-              let sortedTickets = useMemo(() => {
-                let arr = [...sprintTickets];
-                if (expandedSprint === sprint && ticketSort.key) {
-                  arr.sort((a, b) => {
-                    let aVal = a[ticketSort.key];
-                    let bVal = b[ticketSort.key];
-                    if (ticketSort.key === "timeBlocked") {
-                      aVal = parseTimeBlocked(aVal);
-                      bVal = parseTimeBlocked(bVal);
-                    }
-                    if (typeof aVal === "number" && typeof bVal === "number") {
-                      return ticketSort.direction === "asc" ? aVal - bVal : bVal - aVal;
-                    } else {
-                      return ticketSort.direction === "asc"
-                        ? (aVal || "").toString().localeCompare((bVal || "").toString())
-                        : (bVal || "").toString().localeCompare((aVal || "").toString());
-                    }
-                  });
-                }
-                return arr;
-              }, [sprintTickets, expandedSprint, ticketSort, sprint]);
+              // Use precomputed sorted tickets
+              const sortedTickets = sortedTicketsBySprint[sprint];
               return (
                 <div key={sprint} className="bg-white rounded shadow p-4">
                   <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedSprint(expandedSprint === sprint ? null : sprint)}>

@@ -9,14 +9,12 @@ export function parseDurationStringToHours(str) {
 }
 
 export function formatHoursToDuration(hours) {
-  if (typeof hours !== 'number' || isNaN(hours) || hours < 0) return '0h';
+  if (!hours || isNaN(hours)) return '0h';
   const d = Math.floor(hours / 24);
-  const h = hours % 24;
-  let result = '';
-  if (d > 0) result += `${d}d`;
-  if (h > 0) result += (result ? ' ' : '') + `${h}h`;
-  if (!result) result = '0h';
-  return result;
+  const h = Math.round(hours % 24);
+  if (d === 0) return `${h}h`;
+  if (h === 0) return `${d}d`;
+  return `${d}d ${h}h`;
 }
 
 // Consistent date formatting: 'YYYY-MM-DD HH:mm'
@@ -43,4 +41,39 @@ export function validateTicket(ticket) {
     }
   }
   return issues;
+}
+
+/**
+ * Calculate working hours (Mon-Fri, 8:30-17:30) between two Date objects.
+ * Returns a float (hours, can be fractional).
+ */
+export function calculateWorkingHours(start, end) {
+  if (!(start instanceof Date) || !(end instanceof Date) || isNaN(start) || isNaN(end) || end <= start) return 0;
+  const WORK_START_HOUR = 8;
+  const WORK_START_MIN = 30;
+  const WORK_END_HOUR = 17;
+  const WORK_END_MIN = 30;
+  let total = 0;
+  let current = new Date(start);
+  while (current < end) {
+    // Skip weekends
+    const day = current.getDay();
+    if (day !== 0 && day !== 6) { // 0=Sun, 6=Sat
+      // Workday boundaries
+      const workStart = new Date(current);
+      workStart.setHours(WORK_START_HOUR, WORK_START_MIN, 0, 0);
+      const workEnd = new Date(current);
+      workEnd.setHours(WORK_END_HOUR, WORK_END_MIN, 0, 0);
+      // Calculate overlap
+      const intervalStart = current > workStart ? current : workStart;
+      const intervalEnd = end < workEnd ? end : workEnd;
+      if (intervalStart < intervalEnd) {
+        total += (intervalEnd - intervalStart) / (1000 * 60 * 60);
+      }
+    }
+    // Move to next day
+    current.setDate(current.getDate() + 1);
+    current.setHours(0, 0, 0, 0);
+  }
+  return Math.max(0, total);
 } 

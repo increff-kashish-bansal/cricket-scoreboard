@@ -53,11 +53,11 @@ function TopBar() {
   };
 
   return (
-    <div className="flex items-center justify-between bg-white border-b border-neutral-200 px-6 py-4 mb-8 sticky top-0 z-10 shadow-sm">
-      <div className="font-bold text-xl text-neutral-800">Tech Scoreboard</div>
-      <div className="flex gap-3 items-center">
+    <div className="flex items-center justify-between bg-neutral-100 shadow-sm px-8 py-4 mb-6 sticky top-0 z-10">
+      <div className="font-bold text-lg">Tech Scoreboard</div>
+      <div className="flex gap-2 items-center">
         <select
-          className="border border-neutral-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+          className="border rounded px-2 py-1 text-sm"
           value={selectedCsv}
           onChange={handleCsvSelect}
           disabled={loading}
@@ -67,7 +67,7 @@ function TopBar() {
           ))}
         </select>
         <button
-          className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2 transition-colors"
+          className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
           onClick={reload}
           disabled={loading}
         >
@@ -88,7 +88,7 @@ function TopBar() {
           onChange={handleFileChange}
         />
         <button
-          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
+          className="bg-status-done text-white px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
           onClick={() => fileInputRef.current && fileInputRef.current.click()}
           disabled={loading}
         >
@@ -109,12 +109,12 @@ function TopBar() {
 function SidebarNav() {
   const location = useLocation();
   return (
-    <nav className="flex gap-3 mb-6">
+    <nav className="flex gap-2 mb-4">
       {navLinks.map(link => (
         <a
           key={link.path}
           href={link.path}
-          className={`px-4 py-3 rounded-lg font-semibold transition-colors duration-200 ${location.pathname === link.path ? 'bg-blue-600 text-white shadow-md' : 'text-gray-700 hover:bg-blue-50 border border-transparent hover:border-blue-200'}`}
+          className={`px-3 py-2 rounded font-semibold transition-colors duration-200 ${location.pathname === link.path ? 'bg-blue-600 text-white shadow' : 'text-gray-700 hover:bg-blue-100'}`}
           aria-current={location.pathname === link.path ? 'page' : undefined}
         >
           {link.name}
@@ -194,9 +194,9 @@ function App() {
       <TicketsProvider>
         <Router>
           <TopBar />
-          <div className="max-w-7xl mx-auto px-6">
+          <div className="max-w-7xl mx-auto px-4">
             <SidebarNav />
-            <div className="min-h-[70vh] bg-white rounded-xl shadow-lg p-8 mb-8 animate-fadein">
+            <div className="min-h-[60vh] bg-white rounded shadow p-6 mb-8 animate-fadein">
               <AppRoutes />
             </div>
           </div>
