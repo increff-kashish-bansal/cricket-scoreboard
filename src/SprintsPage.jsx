@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
-import { CheckCircleIcon, ExclamationCircleIcon, ClockIcon, UserGroupIcon, FireIcon } from "@heroicons/react/24/solid";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell, CartesianGrid } from "recharts";
+import { CheckCircleIcon, ExclamationCircleIcon, ClockIcon, UserGroupIcon, FireIcon, ArrowPathIcon, InformationCircleIcon } from "@heroicons/react/24/solid";
 
 function parseTimeBlocked(str) {
   if (!str || str === "-") return 0;
@@ -141,51 +141,103 @@ export default function SprintsPage({ tickets = [], loading }) {
     <div>
       <h1 className="text-2xl font-bold mb-6">Sprints</h1>
       {/* Sprint Filter & Search */}
-      <div className="flex flex-wrap gap-4 items-end mb-6">
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-medium mb-1">Search Sprint</label>
-          <input
-            type="text"
-            className="border rounded px-2 py-1 w-full"
-            placeholder="Search by sprint name or number"
-            value={sprintSearch}
-            onChange={e => setSprintSearch(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Sprint</label>
-          <select
-            className="border rounded px-2 py-1"
-            value={sprintFilter}
-            onChange={e => setSprintFilter(e.target.value)}
-          >
-            <option value="">All</option>
-            {Object.keys(sprints).map(s => (
-              <option key={s} value={s}>{s}</option>
-            ))}
-          </select>
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-4 mb-6">
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-sm font-medium text-neutral-600 mb-1">Search Sprint</label>
+            <input
+              type="text"
+              className="border border-neutral-300 rounded-md px-3 py-2 w-full text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              placeholder="Search by sprint name or number"
+              value={sprintSearch}
+              onChange={e => setSprintSearch(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-neutral-600 mb-1">Sprint</label>
+            <select
+              className="border border-neutral-300 rounded-md px-3 py-2 w-full text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+              value={sprintFilter}
+              onChange={e => setSprintFilter(e.target.value)}
+            >
+              <option value="">All</option>
+              {Object.keys(sprints).map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
       {/* Stacked Bar Chart */}
       <div className="mb-8 bg-white rounded shadow p-4">
-        <h2 className="text-lg font-semibold mb-4">Sprint Progress</h2>
-        <div className="w-full h-64">
-          <ResponsiveContainer>
-            <BarChart data={sprintChartData} layout="vertical" margin={{ left: 80, right: 20, top: 10, bottom: 10 }}>
-              <XAxis type="number" allowDecimals={false} />
-              <YAxis dataKey="sprint" type="category" width={100} />
-              <Tooltip />
-              <Legend />
-              <Bar dataKey="Completed" stackId="a" fill="#22c55e" name="Completed" onClick={(_, idx) => setExpandedSprint(sprintNames[idx])} cursor="pointer" />
-              <Bar dataKey="Blocked" stackId="a" fill="#f59e42" name="Blocked" onClick={(_, idx) => setExpandedSprint(sprintNames[idx])} cursor="pointer" />
-              <Bar dataKey="Open" stackId="a" fill="#60a5fa" name="Open" onClick={(_, idx) => setExpandedSprint(sprintNames[idx])} cursor="pointer" />
-            </BarChart>
-          </ResponsiveContainer>
+        <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Sprint Progress</h2>
+          <div className="w-full h-64">
+            <ResponsiveContainer>
+              <BarChart
+                data={sprintChartData}
+                layout="vertical"
+                margin={{ left: 80, right: 24, top: 24, bottom: 24 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke={"#e5e7eb"} />
+                <XAxis
+                  type="number"
+                  allowDecimals={false}
+                  tickLine={{ stroke: '#9ca3af' }}
+                  axisLine={{ stroke: '#9ca3af' }}
+                />
+                <YAxis
+                  dataKey="sprint"
+                  type="category"
+                  width={100}
+                  tickLine={{ stroke: '#9ca3af' }}
+                  axisLine={{ stroke: '#9ca3af' }}
+                />
+                <Tooltip
+                  contentStyle={{ background: '#f5f5f5', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
+                  wrapperClassName="!z-50"
+                  labelClassName="text-neutral-700"
+                  itemStyle={{ color: '#374151' }}
+                />
+                <Legend wrapperStyle={{ color: '#52525b' }} iconType="circle" />
+                <Bar
+                  dataKey="Completed"
+                  stackId="a"
+                  fill="#22c55e" // theme('colors.status.done')
+                  name="Completed"
+                  onClick={(_, idx) => setExpandedSprint(sprintNames[idx])}
+                  cursor="pointer"
+                  radius={[4, 4, 4, 4]}
+                />
+                <Bar
+                  dataKey="Blocked"
+                  stackId="a"
+                  fill="#f87171" // theme('colors.status.blocked')
+                  name="Blocked"
+                  onClick={(_, idx) => setExpandedSprint(sprintNames[idx])}
+                  cursor="pointer"
+                  radius={[4, 4, 4, 4]}
+                />
+                <Bar
+                  dataKey="Open"
+                  stackId="a"
+                  fill="#fbbf24" // theme('colors.status-in-progress')
+                  name="Open"
+                  onClick={(_, idx) => setExpandedSprint(sprintNames[idx])}
+                  cursor="pointer"
+                  radius={[4, 4, 4, 4]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="text-xs text-gray-500 mt-2">Click a bar to view sprint details below.</div>
         </div>
-        <div className="text-xs text-gray-500 mt-2">Click a bar to view sprint details below.</div>
       </div>
       {loading ? (
-        <div className="p-8 text-center text-gray-500">Loading data...</div>
+        <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
+          <ArrowPathIcon className="h-10 w-10 animate-spin mb-2" />
+          <div>Loading data...</div>
+        </div>
       ) : (
         <div className="space-y-6">
           {/* Sprint Summary Cards */}
@@ -213,7 +265,10 @@ export default function SprintsPage({ tickets = [], loading }) {
             </div>
           )}
           {sprintNames.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">No sprints found. Try adjusting your filters or search.</div>
+            <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
+              <InformationCircleIcon className="h-10 w-10 mb-2" />
+              <div>No sprints found. Try adjusting your filters or search.</div>
+            </div>
           ) : (
             sprintNames.map(sprint => {
               const sprintTickets = sprints[sprint];
@@ -247,7 +302,7 @@ export default function SprintsPage({ tickets = [], loading }) {
                       <h2 className="text-lg font-semibold">{sprint}</h2>
                       {getEfficiencyBadge(stats.efficiency)}
                     </div>
-                    <button className="text-blue-600 hover:underline">{expandedSprint === sprint ? "Hide" : "Show"} Details</button>
+                    <button className="bg-transparent text-primary border border-primary px-3 py-1 rounded-md hover:bg-primary-light hover:text-white transition-all" onClick={() => setExpandedSprint(expandedSprint === sprint ? null : sprint)}>{expandedSprint === sprint ? "Hide" : "Show"} Details</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div><span className="font-semibold">Tickets Blocked:</span> {stats.blockedCount}</div>
@@ -260,7 +315,7 @@ export default function SprintsPage({ tickets = [], loading }) {
                     <div className="mt-6">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold">Tickets</h3>
-                        <button onClick={() => handleExport(sortedTickets)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Export CSV</button>
+                        <button onClick={() => handleExport(sortedTickets)} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Export CSV</button>
                       </div>
                       <div className="overflow-x-auto">
                         {sortedTickets.length === 0 ? (

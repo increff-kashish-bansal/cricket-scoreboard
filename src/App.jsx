@@ -3,6 +3,7 @@ import {
   Routes,
   Route,
   Link,
+  NavLink,
   useLocation
 } from "react-router-dom";
 import TicketsPage from "./TicketsPage.jsx";
@@ -13,6 +14,8 @@ import BlockersPage from "./BlockersPage.jsx";
 import { TicketsProvider, useTicketsContext } from "./TicketsContext.jsx";
 import Dashboard from "./Dashboard.jsx";
 import React, { useEffect, useState } from "react";
+import { ArrowPathIcon } from "@heroicons/react/24/solid";
+import { Toaster } from 'react-hot-toast';
 
 const navLinks = [
   { name: "Dashboard", path: "/" },
@@ -50,7 +53,7 @@ function TopBar() {
   };
 
   return (
-    <div className="flex items-center justify-between bg-white shadow px-6 py-3 mb-6 sticky top-0 z-10">
+    <div className="flex items-center justify-between bg-neutral-100 shadow-sm px-8 py-4 mb-6 sticky top-0 z-10">
       <div className="font-bold text-lg">Tech Scoreboard</div>
       <div className="flex gap-2 items-center">
         <select
@@ -64,11 +67,18 @@ function TopBar() {
           ))}
         </select>
         <button
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
           onClick={reload}
           disabled={loading}
         >
-          {loading ? "Reloading..." : "Reload CSV"}
+          {loading ? (
+            <>
+              <ArrowPathIcon className="h-5 w-5 animate-spin" />
+              Reloading...
+            </>
+          ) : (
+            "Reload CSV"
+          )}
         </button>
         <input
           type="file"
@@ -78,11 +88,18 @@ function TopBar() {
           onChange={handleFileChange}
         />
         <button
-          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          className="bg-status-done text-white px-4 py-2 rounded-md hover:bg-primary-dark disabled:opacity-50 flex items-center gap-2"
           onClick={() => fileInputRef.current && fileInputRef.current.click()}
           disabled={loading}
         >
-          Upload CSV
+          {loading ? (
+            <>
+              <ArrowPathIcon className="h-5 w-5 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            "Upload CSV"
+          )}
         </button>
       </div>
     </div>
@@ -109,18 +126,25 @@ function SidebarNav() {
 
 function Sidebar() {
   return (
-    <aside className="bg-gray-800 text-white w-64 min-h-screen flex-shrink-0 hidden md:block">
-      <div className="p-6 font-bold text-xl border-b border-gray-700">Tech Scoreboard</div>
+    <aside className="bg-neutral-900 text-neutral-100 w-64 min-h-screen flex-shrink-0 hidden md:block">
+      <div className="p-6 font-bold text-xl border-b border-neutral-800">Tech Scoreboard</div>
       <nav className="mt-6">
         <ul>
           {navLinks.map(link => (
             <li key={link.path}>
-              <Link
+              <NavLink
                 to={link.path}
-                className="block px-6 py-3 hover:bg-gray-700 transition-colors rounded"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-6 py-2 rounded-md transition-colors ${
+                    isActive
+                      ? 'bg-primary-dark text-white font-semibold'
+                      : 'text-neutral-300 hover:bg-neutral-800'
+                  }`
+                }
               >
+                <span className="w-4 h-4 bg-current rounded-full opacity-75"></span>
                 {link.name}
-              </Link>
+              </NavLink>
             </li>
           ))}
         </ul>
@@ -133,9 +157,9 @@ function Layout({ children }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <div className="flex-1 bg-gray-100">
+      <div className="flex-1 bg-neutral-50">
         <TopBar />
-        <main className="p-8">{children}</main>
+        <main className="p-6 md:p-8">{children}</main>
       </div>
     </div>
   );
@@ -144,7 +168,7 @@ function Layout({ children }) {
 function Placeholder({ title }) {
   return (
     <div className="flex items-center justify-center h-full">
-      <h1 className="text-3xl font-bold text-gray-800">{title}</h1>
+      <h1 className="text-3xl font-bold text-neutral-700">{title}</h1>
     </div>
   );
 }
@@ -165,24 +189,27 @@ function AppRoutes() {
 
 function App() {
   return (
-    <TicketsProvider>
-      <Router>
-        <TopBar />
-        <div className="max-w-7xl mx-auto px-4">
-          <SidebarNav />
-          <div className="min-h-[60vh] bg-white rounded shadow p-6 mb-8 animate-fadein">
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/tickets" element={<TicketsPage />} />
-              <Route path="/tickets/:id" element={<TicketDetailPage />} />
-              <Route path="/blockers" element={<BlockersPage />} />
-              <Route path="/sprints" element={<SprintsPage />} />
-              <Route path="/people" element={<PeoplePage />} />
-            </Routes>
+    <>
+      <Toaster position="top-right" />
+      <TicketsProvider>
+        <Router>
+          <TopBar />
+          <div className="max-w-7xl mx-auto px-4">
+            <SidebarNav />
+            <div className="min-h-[60vh] bg-white rounded shadow p-6 mb-8 animate-fadein">
+              <Routes>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/tickets" element={<TicketsPage />} />
+                <Route path="/tickets/:id" element={<TicketDetailPage />} />
+                <Route path="/blockers" element={<BlockersPage />} />
+                <Route path="/sprints" element={<SprintsPage />} />
+                <Route path="/people" element={<PeoplePage />} />
+              </Routes>
+            </div>
           </div>
-        </div>
-      </Router>
-    </TicketsProvider>
+        </Router>
+      </TicketsProvider>
+    </>
   );
 }
 

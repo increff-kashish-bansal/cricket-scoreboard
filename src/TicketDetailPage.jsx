@@ -20,13 +20,22 @@ function formatDuration(dur) {
   return `${d ? d + "d " : ""}${h ? h + "h" : ""}`.trim();
 }
 
-// Timeline colors
-const statusColors = {
-  "In Progress": "bg-yellow-400",
-  Blocked: "bg-red-500",
-  Done: "bg-green-500",
-  "To Do": "bg-gray-300",
-  Backlog: "bg-gray-300",
+// Helper to map status to new status-* classes
+const statusPillClass = status => {
+  switch (status) {
+    case "In Progress":
+      return "status-in-progress";
+    case "Blocked":
+      return "status-blocked";
+    case "Done":
+      return "status-done";
+    case "To Do":
+      return "status-to-do";
+    case "Backlog":
+      return "status-to-do";
+    default:
+      return "status-to-do";
+  }
 };
 
 export default function TicketDetailPage({ tickets = [], loading }) {
@@ -178,33 +187,33 @@ export default function TicketDetailPage({ tickets = [], loading }) {
   const percentBlocked = (cycleH && blockedH != null) ? Math.round((blockedH / cycleH) * 100) : null;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8">
+    <div className="max-w-3xl mx-auto space-y-8 px-4 md:px-0">
       {/* High-Level Stats */}
-      <div className="flex flex-wrap gap-6 bg-white rounded shadow p-6 items-center">
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6 flex flex-wrap gap-6 items-center">
         <div>
-          <div className="text-xs text-gray-500">Time in Dev</div>
+          <div className="text-xs text-neutral-500">Time in Dev</div>
           <div className="text-lg font-bold">{devH != null ? devH + 'h' : '-'}</div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">Time Blocked</div>
+          <div className="text-xs text-neutral-500">Time Blocked</div>
           <div className="text-lg font-bold">{blockedH != null ? blockedH + 'h' : '-'}</div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">Total Cycle Time</div>
+          <div className="text-xs text-neutral-500">Total Cycle Time</div>
           <div className="text-lg font-bold">{cycleH != null ? cycleH + 'h' : '-'}</div>
         </div>
         <div>
-          <div className="text-xs text-gray-500">% Time Blocked</div>
+          <div className="text-xs text-neutral-500">% Time Blocked</div>
           <div className="text-lg font-bold">{percentBlocked != null ? percentBlocked + '%' : '-'}</div>
         </div>
       </div>
 
       {/* Top: Title, Status, Owner, Handoffs */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white rounded shadow p-6">
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold">{ticket.title || `Ticket #${id}`}</h1>
-            <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusColors[ticket.status] || 'bg-gray-200 text-gray-800 border-gray-300'}`}>{ticket.status || statusPhases[statusPhases.length-1]?.status}</span>
+            <h1 className="text-2xl font-semibold text-neutral-800">{ticket.title || `Ticket #${id}`}</h1>
+            <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusPillClass(ticket.status)}`}>{ticket.status || statusPhases[statusPhases.length-1]?.status}</span>
           </div>
           <div className="flex items-center gap-2 mt-2">
             <span className="font-semibold">Owner:</span>
@@ -228,21 +237,21 @@ export default function TicketDetailPage({ tickets = [], loading }) {
               ))}
             </div>
           </div>
-          <span className="text-xs text-gray-500">Total handoffs: {handoffs.length - 1}</span>
+          <span className="text-xs text-neutral-500">Total handoffs: {handoffs.length - 1}</span>
         </div>
       </div>
 
       {/* Navigation */}
       <div className="flex justify-between items-center">
         <button
-          className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+          className="px-4 py-2 rounded bg-neutral-200 text-neutral-700 hover:bg-neutral-300 disabled:opacity-50"
           onClick={() => prevId && navigate(`/tickets/${prevId}`)}
           disabled={!prevId}
         >
           ← Previous
         </button>
         <button
-          className="px-4 py-2 rounded bg-gray-200 text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+          className="px-4 py-2 rounded bg-neutral-200 text-neutral-700 hover:bg-neutral-300 disabled:opacity-50"
           onClick={() => nextId && navigate(`/tickets/${nextId}`)}
           disabled={!nextId}
         >
@@ -251,38 +260,41 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       </div>
 
       {/* Timeline Visualization */}
-      <div className="bg-white rounded shadow p-6">
-        <h2 className="text-lg font-semibold mb-4">Status Timeline</h2>
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-semibold text-neutral-700 mb-4">Status Timeline</h2>
         <div className="flex items-center gap-2 w-full relative">
           {/* Start label */}
-          <span className="absolute left-0 -top-6 text-xs font-semibold whitespace-nowrap">
+          <span className="absolute left-0 -top-6 text-xs font-semibold whitespace-nowrap text-neutral-700">
             {timelinePhases[0]?.start ? new Date(timelinePhases[0].start).toLocaleString() : ''}
           </span>
           {/* End label */}
-          <span className="absolute right-0 -top-6 text-xs font-semibold whitespace-nowrap">
+          <span className="absolute right-0 -top-6 text-xs font-semibold whitespace-nowrap text-neutral-700">
             {timelinePhases[timelinePhases.length-1]?.end ? new Date(timelinePhases[timelinePhases.length-1].end).toLocaleString() : 'now'}
           </span>
           {/* Timeline segments */}
           {timelinePhases.map((phase, idx) => {
-            // Calculate total duration for proportional flex
-            const totalDuration = timelinePhases.reduce((sum, p) => sum + (p.durationH || 0), 0) || 1;
-            const flexGrow = phase.durationH || 1;
+            const phaseClass = statusPillClass(phase.status).replace('status-', 'bg-status-');
+            const nextPhase = timelinePhases[idx + 1];
             return (
               <div
                 key={idx}
-                className={`relative group h-8 rounded ${statusColors[phase.status] || 'bg-gray-300'}`}
-                style={{ flex: `${flexGrow} ${flexGrow} 0%`, minWidth: '30px' }}
+                className={`relative group h-8 rounded ${phaseClass} flex items-center justify-center`}
+                style={{ flex: `${phase.durationH} ${phase.durationH} 0%`, minWidth: '30px' }}
               >
-                <span className="absolute left-1/2 -translate-x-1/2 -top-7 text-xs font-semibold whitespace-nowrap">
+                <span className="absolute left-1/2 -translate-x-1/2 -top-7 text-xs font-semibold whitespace-nowrap text-neutral-700">
                   {phase.status}
                 </span>
                 {/* Improved tooltip */}
-                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-10 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 opacity-0 transition-opacity bg-black text-white px-3 py-2 rounded shadow text-xs whitespace-nowrap">
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-10 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 opacity-0 transition-opacity bg-neutral-800 text-white px-2 py-1 rounded-md text-xs whitespace-nowrap">
                   <div><span className="font-semibold">Status:</span> {phase.status}</div>
                   <div><span className="font-semibold">Start:</span> {phase.start ? new Date(phase.start).toLocaleString() : '-'}</div>
                   <div><span className="font-semibold">End:</span> {phase.end ? new Date(phase.end).toLocaleString() : 'now'}</div>
                   <div><span className="font-semibold">Duration:</span> {phase.durationH != null ? formatDuration(phase.durationH) : '-'}</div>
                 </div>
+                {/* Separator for phase transition */}
+                {nextPhase && (
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-neutral-300 border-2 border-white z-20"></span>
+                )}
               </div>
             );
           })}
@@ -290,27 +302,27 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       </div>
 
       {/* Blocker Log */}
-      <div className="bg-white rounded shadow p-6">
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold">Blocker Log</h2>
-          <span className="text-xs text-gray-500">{blockerLog.length} event(s)</span>
+          <h2 className="text-lg font-semibold text-neutral-700">Blocker Log</h2>
+          <span className="text-xs text-neutral-500">{blockerLog.length} event(s)</span>
         </div>
-        <div className="divide-y">
+        <div className="divide-y divide-neutral-200">
           {blockerLog.map((b, i) => (
             <div key={i} className="py-2">
               <div className="flex items-center gap-4">
-                <span className="font-semibold text-red-700">{b.blockedBy}</span>
-                <span className="text-xs text-gray-500">{b.since ? new Date(b.since).toLocaleString() : '-'} → {b.resumedAt ? new Date(b.resumedAt).toLocaleString() : 'now'}</span>
-                <span className="text-xs text-gray-700 font-semibold">Duration: {b.duration || '-'}</span>
+                <span className="font-semibold text-status-blocked">{b.blockedBy}</span>
+                <span className="text-xs text-neutral-500">{b.since ? new Date(b.since).toLocaleString() : '-'} → {b.resumedAt ? new Date(b.resumedAt).toLocaleString() : 'now'}</span>
+                <span className="text-xs text-neutral-700 font-semibold">Duration: {b.duration || '-'}</span>
                 <button
-                  className="ml-auto text-blue-600 hover:underline text-xs"
+                  className="ml-auto border border-neutral-300 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 rounded-md px-3 py-1 text-xs transition-all"
                   onClick={() => setExpandedBlocker(expandedBlocker === i ? null : i)}
                 >
                   {expandedBlocker === i ? "Hide Reason" : "Show Reason"}
                 </button>
               </div>
               {expandedBlocker === i && (
-                <div className="mt-2 bg-gray-50 rounded p-2 text-sm text-gray-800">
+                <div className="mt-2 bg-neutral-50 rounded-md p-2 text-sm text-neutral-700">
                   {b.reason}
                 </div>
               )}
@@ -320,11 +332,11 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       </div>
 
       {/* Status Change Log */}
-      <div className="bg-white rounded shadow p-6">
-        <h2 className="text-lg font-semibold mb-2">Status Change Log</h2>
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
+        <h2 className="text-lg font-semibold text-neutral-700 mb-2">Status Change Log</h2>
         <table className="min-w-full text-sm">
           <thead>
-            <tr className="bg-gray-100 text-left">
+            <tr className="bg-neutral-200 text-neutral-700 text-left">
               <th className="px-4 py-2">Timestamp</th>
               <th className="px-4 py-2">Old Status</th>
               <th className="px-4 py-2">New Status</th>
@@ -333,7 +345,7 @@ export default function TicketDetailPage({ tickets = [], loading }) {
           </thead>
           <tbody>
             {statusLog.map((log, i) => (
-              <tr key={i} className="border-t">
+              <tr key={i} className="border-t border-neutral-200 hover:bg-neutral-100">
                 <td className="px-4 py-2">{new Date(log.timestamp).toLocaleString()}</td>
                 <td className="px-4 py-2">{log.from}</td>
                 <td className="px-4 py-2">{log.to}</td>

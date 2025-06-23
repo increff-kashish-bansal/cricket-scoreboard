@@ -2,6 +2,7 @@ import React from "react";
 import { createContext, useContext, useState, useCallback } from "react";
 import Papa from "papaparse";
 import { parseDurationStringToHours, formatHoursToDuration, formatDate, validateTicket } from './utils.js';
+import toast from 'react-hot-toast';
 
 const TicketsContext = createContext();
 
@@ -120,8 +121,12 @@ export function TicketsProvider({ children }) {
       complete: (results) => {
         setTickets(preprocessTickets(results.data));
         setLoading(false);
+        toast.success("Data loaded successfully!");
       },
-      error: () => setLoading(false),
+      error: () => {
+        setLoading(false);
+        toast.error("Failed to load CSV. Check format.");
+      },
     });
   }, []);
 
@@ -133,8 +138,12 @@ export function TicketsProvider({ children }) {
       complete: (results) => {
         setTickets(preprocessTickets(results.data));
         setLoading(false);
+        toast.success("Data loaded successfully!");
       },
-      error: () => setLoading(false),
+      error: () => {
+        setLoading(false);
+        toast.error("Failed to load CSV. Check format.");
+      },
     });
   }, []);
 
