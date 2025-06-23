@@ -24,10 +24,10 @@ export function TicketsProvider({ children }) {
         }
         return d;
       }
-      ticket.Created_On_Date = safeDate(ticket.Created_On, 'Created_On');
-      ticket.Resolved_At_Date = safeDate(ticket.Resolved_At, 'Resolved_At');
-      ticket.Blocked_Since_Date = safeDate(ticket.Blocked_Since, 'Blocked_Since');
-      ticket.Unblocked_At_Date = safeDate(ticket.Unblocked_At, 'Unblocked_At');
+      ticket.Created_On_Date = safeDate(ticket.createdOn || ticket.Created_On, 'createdOn/Created_On');
+      ticket.Resolved_At_Date = safeDate(ticket.closedOn || ticket.Resolved_At, 'closedOn/Resolved_At');
+      ticket.Blocked_Since_Date = safeDate(ticket.blockedSince || ticket.Blocked_Since, 'blockedSince/Blocked_Since');
+      ticket.Unblocked_At_Date = safeDate(ticket.resumedAt || ticket.Unblocked_At, 'resumedAt/Unblocked_At');
       ticket.isBlocked = ticket.blocked === true || ticket.blocked === 'TRUE' || ticket.blocked === 'true';
 
       // --- 2.2 Parse and Enrich Event_Log ---

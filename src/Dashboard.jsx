@@ -73,6 +73,7 @@ function Dashboard() {
   // --- ENHANCEMENT 8: More Granular Dashboard Metrics ---
   // Average Time to Close (for Done tickets)
   const doneTickets = tickets.filter(t => t.status === 'Done' && typeof t.totalCycleTimeHours === 'number');
+  console.log('Done tickets with cycle time:', doneTickets.map(t => ({ id: t.id, cycleTime: t.totalCycleTimeHours })));
   const avgTimeToClose = doneTickets.length
     ? Math.round(doneTickets.reduce((sum, t) => sum + t.totalCycleTimeHours, 0) / doneTickets.length)
     : null;
