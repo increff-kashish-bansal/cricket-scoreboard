@@ -1,44 +1,112 @@
-import { useState, useEffect } from "react";
-import Papa from "papaparse";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import { saveAs } from "file-saver";
 
 const statuses = ["To Do", "In Progress", "Blocked", "Done"];
-const owners = ["Alice", "Bob", "Charlie"];
+const statusPillColors = {
+  "In Progress": "bg-yellow-100 text-yellow-800 border-yellow-300",
+  "Blocked": "bg-red-100 text-red-800 border-red-300",
+  "Done": "bg-green-100 text-green-800 border-green-300",
+  "To Do": "bg-gray-100 text-gray-800 border-gray-300",
+  "Backlog": "bg-gray-100 text-gray-800 border-gray-300",
+};
 
-export default function TicketsPage() {
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(true);
+function parseTimeBlocked(str) {
+  if (!str || str === "-") return 0;
+  let days = 0, hours = 0;
+  const dMatch = str.match(/(\d+)d/);
+  const hMatch = str.match(/(\d+)h/);
+  if (dMatch) days = parseInt(dMatch[1], 10);
+  if (hMatch) hours = parseInt(hMatch[1], 10);
+  return days * 24 + hours;
+}
+
+function toCSV(rows) {
+  if (!rows.length) return '';
+  const keys = Object.keys(rows[0]);
+  const csv = [keys.join(",")].concat(
+    rows.map(row => keys.map(k => `"${(row[k] || "").replace(/"/g, '""')}"`).join(","))
+  ).join("\n");
+  return csv;
+}
+
+export default function TicketsPage({ tickets = [], loading }) {
   const [statusFilter, setStatusFilter] = useState("");
   const [ownerFilter, setOwnerFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
 
-  useEffect(() => {
-    setLoading(true);
-    Papa.parse("/tickets.csv", {
-      download: true,
-      header: true,
-      skipEmptyLines: true,
-      complete: (results) => {
-        setTickets(results.data);
-        setLoading(false);
-      },
-      error: () => setLoading(false),
-    });
-  }, []);
-
-  // Dynamically get unique owners from data
   const uniqueOwners = Array.from(new Set(tickets.map(t => t.owner))).filter(Boolean);
 
-  const filteredTickets = tickets.filter(ticket => {
-    return (
-      (statusFilter === "" || ticket.status === statusFilter) &&
-      (ownerFilter === "" || ticket.owner === ownerFilter)
-    );
+  // Filtering
+  let filteredTickets = tickets.filter(ticket => {
+    const matchesStatus = statusFilter === "" || ticket.status === statusFilter;
+    const matchesOwner = ownerFilter === "" || ticket.owner === ownerFilter;
+    const matchesSearch =
+      searchTerm.trim() === "" ||
+      (ticket.id && ticket.id.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (ticket.title && ticket.title.toLowerCase().includes(searchTerm.toLowerCase()));
+    return matchesStatus && matchesOwner && matchesSearch;
   });
+
+  // Sorting
+  if (sortConfig.key) {
+    filteredTickets = [...filteredTickets].sort((a, b) => {
+      let aVal = a[sortConfig.key];
+      let bVal = b[sortConfig.key];
+      // Special handling for timeBlocked
+      if (sortConfig.key === "timeBlocked") {
+        aVal = parseTimeBlocked(aVal);
+        bVal = parseTimeBlocked(bVal);
+      }
+      // Fallback for undefined/null
+      if (aVal == null) aVal = '';
+      if (bVal == null) bVal = '';
+      if (typeof aVal === "number" && typeof bVal === "number") {
+        return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+      } else {
+        return sortConfig.direction === "asc"
+          ? aVal.toString().localeCompare(bVal.toString())
+          : bVal.toString().localeCompare(aVal.toString());
+      }
+    });
+  }
+
+  function handleExport() {
+    const csv = toCSV(filteredTickets);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    saveAs(blob, "tickets.csv");
+  }
+
+  function handleSort(key) {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      } else {
+        return { key, direction: "asc" };
+      }
+    });
+  }
+
+  // Table headers config for sorting
+  const columns = [
+    { key: "id", label: "Ticket ID" },
+    { key: "title", label: "Title" },
+    { key: "status", label: "Status" },
+    { key: "owner", label: "Owner" },
+    { key: "blocked", label: "Blocked" },
+    { key: "blockedBy", label: "Blocked By" },
+    { key: "timeInDev", label: "Time in Dev" },
+    { key: "timeBlocked", label: "Time Blocked" },
+  ];
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Tickets</h1>
-      <div className="flex flex-wrap gap-4 mb-4">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Tickets</h1>
+        <button onClick={handleExport} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Export CSV</button>
+      </div>
+      <div className="flex flex-wrap gap-4 mb-4 items-end">
         <div>
           <label className="block text-sm font-medium mb-1">Status</label>
           <select
@@ -65,6 +133,16 @@ export default function TicketsPage() {
             ))}
           </select>
         </div>
+        <div className="flex-1 min-w-[200px]">
+          <label className="block text-sm font-medium mb-1">Search</label>
+          <input
+            type="text"
+            className="border rounded px-2 py-1 w-full"
+            placeholder="Search by Ticket ID or Title"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
       <div className="overflow-x-auto bg-white rounded shadow">
         {loading ? (
@@ -73,14 +151,22 @@ export default function TicketsPage() {
           <table className="min-w-full text-sm">
             <thead>
               <tr className="bg-gray-100 text-left">
-                <th className="px-4 py-2">Ticket ID</th>
-                <th className="px-4 py-2">Title</th>
-                <th className="px-4 py-2">Status</th>
-                <th className="px-4 py-2">Owner</th>
-                <th className="px-4 py-2">Blocked</th>
-                <th className="px-4 py-2">Blocked By</th>
-                <th className="px-4 py-2">Time in Dev</th>
-                <th className="px-4 py-2">Time Blocked</th>
+                {columns.map(col => (
+                  <th
+                    key={col.key}
+                    className="px-4 py-2 cursor-pointer select-none group"
+                    onClick={() => handleSort(col.key)}
+                  >
+                    <span className="flex items-center gap-1">
+                      {col.label}
+                      {sortConfig.key === col.key && (
+                        <span className="text-xs">
+                          {sortConfig.direction === "asc" ? "▲" : "▼"}
+                        </span>
+                      )}
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -91,22 +177,31 @@ export default function TicketsPage() {
                   </td>
                 </tr>
               ) : (
-                filteredTickets.map(ticket => (
-                  <tr key={ticket.id} className="border-t hover:bg-gray-50">
-                    <td className="px-4 py-2 font-mono">
-                      <Link to={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline">
-                        {ticket.id}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-2">{ticket.title}</td>
-                    <td className="px-4 py-2">{ticket.status}</td>
-                    <td className="px-4 py-2">{ticket.owner}</td>
-                    <td className="px-4 py-2">{ticket.blocked === "TRUE" || ticket.blocked === true ? "Y" : "N"}</td>
-                    <td className="px-4 py-2">{ticket.blockedBy || "-"}</td>
-                    <td className="px-4 py-2">{ticket.timeInDev}</td>
-                    <td className="px-4 py-2">{ticket.timeBlocked}</td>
-                  </tr>
-                ))
+                filteredTickets.map(ticket => {
+                  const blockedHours = parseTimeBlocked(ticket.timeBlocked);
+                  const highlight = blockedHours > 72; // 3 days
+                  return (
+                    <tr key={ticket.id} className={`border-t hover:bg-gray-50 ${highlight ? 'bg-red-100' : ''}`}>
+                      <td className="px-4 py-2 font-mono">
+                        <Link to={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline">
+                          {ticket.id}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-2">{ticket.title}</td>
+                      <td className="px-4 py-2">
+                        <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusPillColors[ticket.status] || 'bg-gray-100 text-gray-800 border-gray-300'}`}>{ticket.status}</span>
+                      </td>
+                      <td className="px-4 py-2">{ticket.owner}</td>
+                      <td className="px-4 py-2">{ticket.blocked === "TRUE" || ticket.blocked === true ? "Y" : "N"}</td>
+                      <td className="px-4 py-2">{ticket.blockedBy || "-"}</td>
+                      <td className="px-4 py-2">{ticket.timeInDev}</td>
+                      <td className="px-4 py-2 flex items-center gap-2">
+                        {ticket.timeBlocked}
+                        {highlight && <span title="Blocked > 3 days" className="text-red-600">⚠️</span>}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

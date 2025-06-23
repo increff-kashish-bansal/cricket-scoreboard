@@ -8,6 +8,10 @@ import TicketsPage from "./TicketsPage.jsx";
 import TicketDetailPage from "./TicketDetailPage.jsx";
 import SprintsPage from "./SprintsPage.jsx";
 import PeoplePage from "./PeoplePage.jsx";
+import BlockersPage from "./BlockersPage.jsx";
+import { TicketsProvider, useTicketsContext } from "./TicketsContext.jsx";
+import Dashboard from "./Dashboard.jsx";
+import React from "react";
 
 const navLinks = [
   { name: "Dashboard", path: "/" },
@@ -16,6 +20,48 @@ const navLinks = [
   { name: "Sprints", path: "/sprints" },
   { name: "People", path: "/people" },
 ];
+
+function TopBar() {
+  const { reload, loading, uploadTickets } = useTicketsContext();
+  const fileInputRef = React.useRef();
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      uploadTickets(file);
+      e.target.value = null; // reset input
+    }
+  };
+
+  return (
+    <div className="flex items-center justify-between bg-white shadow px-6 py-3 mb-6 sticky top-0 z-10">
+      <div className="font-bold text-lg">Tech Scoreboard</div>
+      <div className="flex gap-2">
+        <button
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+          onClick={reload}
+          disabled={loading}
+        >
+          {loading ? "Reloading..." : "Reload CSV"}
+        </button>
+        <input
+          type="file"
+          accept=".csv"
+          ref={fileInputRef}
+          style={{ display: "none" }}
+          onChange={handleFileChange}
+        />
+        <button
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+          onClick={() => fileInputRef.current && fileInputRef.current.click()}
+          disabled={loading}
+        >
+          Upload CSV
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function Sidebar() {
   return (
@@ -43,7 +89,10 @@ function Layout({ children }) {
   return (
     <div className="flex min-h-screen">
       <Sidebar />
-      <main className="flex-1 bg-gray-100 p-8">{children}</main>
+      <div className="flex-1 bg-gray-100">
+        <TopBar />
+        <main className="p-8">{children}</main>
+      </div>
     </div>
   );
 }
@@ -56,20 +105,29 @@ function Placeholder({ title }) {
   );
 }
 
+function AppRoutes() {
+  const { tickets, loading } = useTicketsContext();
+  return (
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/tickets" element={<TicketsPage tickets={tickets} loading={loading} />} />
+      <Route path="/tickets/:id" element={<TicketDetailPage tickets={tickets} loading={loading} />} />
+      <Route path="/blockers" element={<BlockersPage tickets={tickets} loading={loading} />} />
+      <Route path="/sprints" element={<SprintsPage tickets={tickets} loading={loading} />} />
+      <Route path="/people" element={<PeoplePage tickets={tickets} loading={loading} />} />
+    </Routes>
+  );
+}
+
 function App() {
   return (
-    <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Placeholder title="Dashboard" />} />
-          <Route path="/tickets" element={<TicketsPage />} />
-          <Route path="/tickets/:id" element={<TicketDetailPage />} />
-          <Route path="/blockers" element={<Placeholder title="Blockers" />} />
-          <Route path="/sprints" element={<SprintsPage />} />
-          <Route path="/people" element={<PeoplePage />} />
-        </Routes>
-      </Layout>
-    </Router>
+    <TicketsProvider>
+      <Router>
+        <Layout>
+          <AppRoutes />
+        </Layout>
+      </Router>
+    </TicketsProvider>
   );
 }
 
