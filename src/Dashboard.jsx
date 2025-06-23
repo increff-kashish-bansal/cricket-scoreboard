@@ -93,81 +93,88 @@ function Dashboard() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">Dashboard</h1>
+      <h1 className="text-3xl font-bold mb-8 text-neutral-800">Dashboard</h1>
       {loading ? (
-        <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
-          <ArrowPathIcon className="h-10 w-10 animate-spin mb-2" />
-          <div>Loading data...</div>
+        <div className="flex flex-col items-center justify-center p-12 text-neutral-500">
+          <ArrowPathIcon className="h-12 w-12 animate-spin mb-4" />
+          <div className="text-lg">Loading data...</div>
         </div>
       ) : (
         <>
           {/* Summary Cards */}
-          <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm p-8 mb-8">
+            <h2 className="text-xl font-semibold text-neutral-700 mb-6">Key Metrics</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               {/* Total Tickets */}
-              <div className="flex items-center gap-3 bg-neutral-card rounded shadow-sm p-4" title="Total number of tickets in the current dataset">
-                <UserGroupIcon className="w-8 h-8 text-primary" />
+              <div className="flex items-center gap-4 bg-white rounded-xl shadow-sm p-6 border border-neutral-200" title="Total number of tickets in the current dataset">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <UserGroupIcon className="w-6 h-6 text-blue-600" />
+                </div>
                 <div>
-                  <div className="text-2xl font-bold text-neutral-800">{totalTickets}</div>
-                  <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide">Total Tickets</div>
+                  <div className="text-3xl font-bold text-neutral-800">{totalTickets}</div>
+                  <div className="text-sm text-neutral-600 font-medium">Total Tickets</div>
                 </div>
               </div>
               {/* Blocked This Sprint */}
-              <div className="flex items-center gap-3 bg-neutral-card rounded shadow-sm p-4" title={`Number of tickets currently blocked in the latest sprint (${currentSprintName})`}>
-                <ExclamationCircleIcon className="w-8 h-8 text-status-in-progress" />
+              <div className="flex items-center gap-4 bg-white rounded-xl shadow-sm p-6 border border-neutral-200" title={`Number of tickets currently blocked in the latest sprint (${currentSprintName})`}>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <ExclamationCircleIcon className="w-6 h-6 text-orange-600" />
+                </div>
                 <div>
-                  <div className="text-2xl font-bold text-neutral-800">{blockedThisSprint}</div>
-                  <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide">Blocked This Sprint</div>
+                  <div className="text-3xl font-bold text-neutral-800">{blockedThisSprint}</div>
+                  <div className="text-sm text-neutral-600 font-medium">Blocked This Sprint</div>
                 </div>
               </div>
               {/* Top 3 Blockers */}
-              <div className="flex items-center gap-3 bg-neutral-card rounded shadow-sm p-4" title="Top 3 entities causing blocks, with average block duration">
-                <FireIcon className="w-8 h-8 text-status-blocked" />
-                <div>
-                  <div className="text-lg font-bold mb-1">Top 3 Blockers</div>
-                  <ul className="text-xs text-gray-700">
-                    {topBlockers.length === 0 ? <li>None</li> : topBlockers.map(([name, stat]) => (
-                      <li key={name} className="flex flex-col gap-0.5 mb-1">
+              <div className="flex items-start gap-4 bg-white rounded-xl shadow-sm p-6 border border-neutral-200" title="Top 3 entities causing blocks, with average block duration">
+                <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                  <FireIcon className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-lg font-bold mb-3 text-neutral-800">Top 3 Blockers</div>
+                  <ul className="text-sm text-neutral-700 space-y-2">
+                    {topBlockers.length === 0 ? <li className="text-neutral-500">None</li> : topBlockers.map(([name, stat]) => (
+                      <li key={name} className="flex flex-col gap-1">
                         <span className="flex items-center gap-2">
-                          <span>{name}</span>
-                          <span className="text-gray-400">({stat.count})</span>
+                          <span className="font-medium">{name}</span>
+                          <span className="text-neutral-500">({stat.count})</span>
                         </span>
-                        <span className="ml-2 text-green-700">Avg Blocked: {stat.count ? Math.round(stat.totalBlocked / stat.count) + 'h' : '-'}</span>
+                        <span className="ml-2 text-green-700 text-xs">Avg Blocked: {stat.count ? Math.round(stat.totalBlocked / stat.count) + 'h' : '-'}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               </div>
               {/* Avg Time to Close */}
-              <div className="flex items-center gap-3 bg-neutral-card rounded shadow-sm p-4" title="Average time (in hours) from ticket creation to Done for completed tickets">
-                <div className="w-8 h-8 flex items-center justify-center rounded-full bg-green-100">
-                  <span className="text-green-700 text-xl font-bold">⏱️</span>
+              <div className="flex items-center gap-4 bg-white rounded-xl shadow-sm p-6 border border-neutral-200" title="Average time (in hours) from ticket creation to Done for completed tickets">
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <span className="text-green-700 text-2xl">⏱️</span>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-neutral-800">{avgTimeToClose != null ? avgTimeToClose + 'h' : '-'}</div>
-                  <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide">Avg Time to Close</div>
+                  <div className="text-3xl font-bold text-neutral-800">{avgTimeToClose != null ? avgTimeToClose + 'h' : '-'}</div>
+                  <div className="text-sm text-neutral-600 font-medium">Avg Time to Close</div>
                 </div>
               </div>
               {/* Tickets Blocked > X Days */}
-              <div className="flex flex-col gap-2 items-start bg-neutral-card rounded shadow-sm p-4" title="Number of tickets blocked for more than the selected threshold (in days)">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 flex items-center justify-center rounded-full bg-red-100">
-                    <span className="text-red-700 text-xl font-bold">⏳</span>
+              <div className="flex flex-col gap-4 bg-white rounded-xl shadow-sm p-6 border border-neutral-200" title="Number of tickets blocked for more than the selected threshold (in days)">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                    <span className="text-red-700 text-2xl">⏳</span>
                   </div>
                   <div>
-                    <div className="text-2xl font-bold text-neutral-800">{ticketsBlockedOverXDays}</div>
-                    <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide">Blocked &gt; {blockedThresholdDays} Days</div>
+                    <div className="text-3xl font-bold text-neutral-800">{ticketsBlockedOverXDays}</div>
+                    <div className="text-sm text-neutral-600 font-medium">Blocked &gt; {blockedThresholdDays} Days</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <label htmlFor="blocked-threshold" className="block text-sm font-medium text-neutral-600 mb-1">Threshold:</label>
+                <div className="flex items-center gap-3">
+                  <label htmlFor="blocked-threshold" className="text-sm font-medium text-neutral-600">Threshold:</label>
                   <input
                     id="blocked-threshold"
                     type="number"
                     min={1}
                     value={blockedThresholdDays}
                     onChange={e => setBlockedThresholdDays(Number(e.target.value) || 1)}
-                    className="border border-neutral-300 rounded-md px-3 py-2 w-full text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-xs"
+                    className="border border-neutral-300 rounded-lg px-3 py-2 w-20 text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all text-sm"
                   />
                 </div>
               </div>
@@ -175,19 +182,19 @@ function Dashboard() {
           </div>
 
           {/* Velocity Chart */}
-          <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Developer Velocity (per Sprint)</h2>
+          <div className="bg-white border border-neutral-200 rounded-xl shadow-sm p-8 mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-neutral-700">Developer Velocity (per Sprint)</h2>
               <div className="flex gap-2">
                 <button
-                  className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${velocityMode === 'tickets' ? 'border-primary text-primary bg-white' : 'border-transparent text-neutral-500 bg-neutral-100'}`}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${velocityMode === 'tickets' ? 'bg-blue-600 text-white shadow-md' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
                   onClick={() => setVelocityMode('tickets')}
                   title="Show number of tickets closed per sprint"
                 >
                   Total Tickets Done
                 </button>
                 <button
-                  className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${velocityMode === 'hours' ? 'border-primary text-primary bg-white' : 'border-transparent text-neutral-500 bg-neutral-100'}`}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${velocityMode === 'hours' ? 'bg-blue-600 text-white shadow-md' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'}`}
                   onClick={() => setVelocityMode('hours')}
                   title="Show total development hours completed per sprint"
                 >
@@ -195,7 +202,7 @@ function Dashboard() {
                 </button>
               </div>
             </div>
-            <div className="w-full h-72">
+            <div className="w-full h-80">
               <ResponsiveContainer>
                 <BarChart
                   data={velocityData}

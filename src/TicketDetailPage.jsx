@@ -187,71 +187,76 @@ export default function TicketDetailPage({ tickets = [], loading }) {
   const percentBlocked = (cycleH && blockedH != null) ? Math.round((blockedH / cycleH) * 100) : null;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 px-4 md:px-0">
+    <div className="max-w-4xl mx-auto space-y-8">
       {/* High-Level Stats */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6 flex flex-wrap gap-6 items-center">
-        <div>
-          <div className="text-xs text-neutral-500">Time in Dev</div>
-          <div className="text-lg font-bold">{devH != null ? devH + 'h' : '-'}</div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-500">Time Blocked</div>
-          <div className="text-lg font-bold">{blockedH != null ? blockedH + 'h' : '-'}</div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-500">Total Cycle Time</div>
-          <div className="text-lg font-bold">{cycleH != null ? cycleH + 'h' : '-'}</div>
-        </div>
-        <div>
-          <div className="text-xs text-neutral-500">% Time Blocked</div>
-          <div className="text-lg font-bold">{percentBlocked != null ? percentBlocked + '%' : '-'}</div>
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl shadow-sm p-8 mb-8">
+        <h2 className="text-lg font-semibold text-neutral-700 mb-6">Ticket Metrics</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="text-center">
+            <div className="text-sm text-neutral-600 mb-1">Time in Dev</div>
+            <div className="text-2xl font-bold text-blue-600">{devH != null ? devH + 'h' : '-'}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-neutral-600 mb-1">Time Blocked</div>
+            <div className="text-2xl font-bold text-red-600">{blockedH != null ? blockedH + 'h' : '-'}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-neutral-600 mb-1">Total Cycle Time</div>
+            <div className="text-2xl font-bold text-green-600">{cycleH != null ? cycleH + 'h' : '-'}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-neutral-600 mb-1">% Time Blocked</div>
+            <div className="text-2xl font-bold text-orange-600">{percentBlocked != null ? percentBlocked + '%' : '-'}</div>
+          </div>
         </div>
       </div>
 
       {/* Top: Title, Status, Owner, Handoffs */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-semibold text-neutral-800">{ticket.title || `Ticket #${id}`}</h1>
-            <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusPillClass(ticket.status)}`}>{ticket.status || statusPhases[statusPhases.length-1]?.status}</span>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <span className="font-semibold">Owner:</span>
-            <span className="inline-flex items-center gap-2">
-              <span className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-lg font-bold text-gray-700">
-                {getInitials(owner)}
-              </span>
-              <span>{owner}</span>
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
-            <span className="font-semibold">Handoffs:</span>
-            <div className="flex items-center gap-1">
-              {handoffs.map((h, i) => (
-                <span key={h} className="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-200">
-                  {h}
-                  {i < handoffs.length - 1 && <span className="mx-1">→</span>}
+      <div className="bg-white border border-neutral-200 rounded-xl shadow-sm p-8 mb-8">
+        <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+          <div className="flex-1">
+            <div className="flex items-center gap-4 mb-4">
+              <h1 className="text-3xl font-bold text-neutral-800">{ticket.title || `Ticket #${id}`}</h1>
+              <span className={`inline-block px-3 py-1 rounded-full border text-sm font-semibold ${statusPillClass(ticket.status)}`}>{ticket.status || statusPhases[statusPhases.length-1]?.status}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-semibold text-neutral-700">Owner:</span>
+              <span className="inline-flex items-center gap-3">
+                <span className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-lg font-bold text-blue-700 border-2 border-blue-200">
+                  {getInitials(owner)}
                 </span>
-              ))}
+                <span className="text-lg">{owner}</span>
+              </span>
             </div>
           </div>
-          <span className="text-xs text-neutral-500">Total handoffs: {handoffs.length - 1}</span>
+          <div className="flex flex-col items-start lg:items-end gap-4">
+            <div className="flex flex-col gap-2">
+              <span className="font-semibold text-neutral-700">Handoffs:</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                {handoffs.map((h, i) => (
+                  <span key={h} className="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-sm font-semibold border border-blue-200">
+                    {h}
+                    {i < handoffs.length - 1 && <span className="mx-2">→</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <span className="text-sm text-neutral-500">Total handoffs: {handoffs.length - 1}</span>
+          </div>
         </div>
       </div>
 
       {/* Navigation */}
       <div className="flex justify-between items-center">
         <button
-          className="px-4 py-2 rounded bg-neutral-200 text-neutral-700 hover:bg-neutral-300 disabled:opacity-50"
+          className="px-6 py-3 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 disabled:opacity-50 transition-colors font-semibold"
           onClick={() => prevId && navigate(`/tickets/${prevId}`)}
           disabled={!prevId}
         >
           ← Previous
         </button>
         <button
-          className="px-4 py-2 rounded bg-neutral-200 text-neutral-700 hover:bg-neutral-300 disabled:opacity-50"
+          className="px-6 py-3 rounded-lg bg-neutral-100 text-neutral-700 hover:bg-neutral-200 disabled:opacity-50 transition-colors font-semibold"
           onClick={() => nextId && navigate(`/tickets/${nextId}`)}
           disabled={!nextId}
         >
@@ -260,15 +265,15 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       </div>
 
       {/* Timeline Visualization */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-        <h2 className="text-lg font-semibold text-neutral-700 mb-4">Status Timeline</h2>
+      <div className="bg-white border border-neutral-200 rounded-xl shadow-sm p-8 mb-8">
+        <h2 className="text-xl font-semibold text-neutral-700 mb-6">Status Timeline</h2>
         <div className="flex items-center gap-2 w-full relative">
           {/* Start label */}
-          <span className="absolute left-0 -top-6 text-xs font-semibold whitespace-nowrap text-neutral-700">
+          <span className="absolute left-0 -top-8 text-sm font-semibold whitespace-nowrap text-neutral-700">
             {timelinePhases[0]?.start ? new Date(timelinePhases[0].start).toLocaleString() : ''}
           </span>
           {/* End label */}
-          <span className="absolute right-0 -top-6 text-xs font-semibold whitespace-nowrap text-neutral-700">
+          <span className="absolute right-0 -top-8 text-sm font-semibold whitespace-nowrap text-neutral-700">
             {timelinePhases[timelinePhases.length-1]?.end ? new Date(timelinePhases[timelinePhases.length-1].end).toLocaleString() : 'now'}
           </span>
           {/* Timeline segments */}
@@ -278,14 +283,14 @@ export default function TicketDetailPage({ tickets = [], loading }) {
             return (
               <div
                 key={idx}
-                className={`relative group h-8 rounded ${phaseClass} flex items-center justify-center`}
-                style={{ flex: `${phase.durationH} ${phase.durationH} 0%`, minWidth: '30px' }}
+                className={`relative group h-10 rounded-lg ${phaseClass} flex items-center justify-center shadow-sm`}
+                style={{ flex: `${phase.durationH} ${phase.durationH} 0%`, minWidth: '40px' }}
               >
-                <span className="absolute left-1/2 -translate-x-1/2 -top-7 text-xs font-semibold whitespace-nowrap text-neutral-700">
+                <span className="absolute left-1/2 -translate-x-1/2 -top-8 text-sm font-semibold whitespace-nowrap text-neutral-700">
                   {phase.status}
                 </span>
                 {/* Improved tooltip */}
-                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-10 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 opacity-0 transition-opacity bg-neutral-800 text-white px-2 py-1 rounded-md text-xs whitespace-nowrap">
+                <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-10 pointer-events-none group-hover:pointer-events-auto group-hover:opacity-100 opacity-0 transition-opacity bg-neutral-800 text-white px-3 py-2 rounded-lg text-sm whitespace-nowrap shadow-lg">
                   <div><span className="font-semibold">Status:</span> {phase.status}</div>
                   <div><span className="font-semibold">Start:</span> {phase.start ? new Date(phase.start).toLocaleString() : '-'}</div>
                   <div><span className="font-semibold">End:</span> {phase.end ? new Date(phase.end).toLocaleString() : 'now'}</div>
@@ -293,7 +298,7 @@ export default function TicketDetailPage({ tickets = [], loading }) {
                 </div>
                 {/* Separator for phase transition */}
                 {nextPhase && (
-                  <span className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-neutral-300 border-2 border-white z-20"></span>
+                  <span className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-neutral-300 border-2 border-white z-20 shadow-sm"></span>
                 )}
               </div>
             );
@@ -302,27 +307,27 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       </div>
 
       {/* Blocker Log */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-lg font-semibold text-neutral-700">Blocker Log</h2>
-          <span className="text-xs text-neutral-500">{blockerLog.length} event(s)</span>
+      <div className="bg-white border border-neutral-200 rounded-xl shadow-sm p-8 mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-semibold text-neutral-700">Blocker Log</h2>
+          <span className="text-sm text-neutral-500 bg-neutral-100 px-3 py-1 rounded-full">{blockerLog.length} event(s)</span>
         </div>
         <div className="divide-y divide-neutral-200">
           {blockerLog.map((b, i) => (
-            <div key={i} className="py-2">
+            <div key={i} className="py-4">
               <div className="flex items-center gap-4">
-                <span className="font-semibold text-status-blocked">{b.blockedBy}</span>
-                <span className="text-xs text-neutral-500">{b.since ? new Date(b.since).toLocaleString() : '-'} → {b.resumedAt ? new Date(b.resumedAt).toLocaleString() : 'now'}</span>
-                <span className="text-xs text-neutral-700 font-semibold">Duration: {b.duration || '-'}</span>
+                <span className="font-semibold text-status-blocked text-lg">{b.blockedBy}</span>
+                <span className="text-sm text-neutral-500">{b.since ? new Date(b.since).toLocaleString() : '-'} → {b.resumedAt ? new Date(b.resumedAt).toLocaleString() : 'now'}</span>
+                <span className="text-sm text-neutral-700 font-semibold bg-neutral-100 px-2 py-1 rounded">Duration: {b.duration || '-'}</span>
                 <button
-                  className="ml-auto border border-neutral-300 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 rounded-md px-3 py-1 text-xs transition-all"
+                  className="ml-auto border border-neutral-300 bg-neutral-50 text-neutral-700 hover:bg-neutral-100 rounded-lg px-4 py-2 text-sm transition-all font-medium"
                   onClick={() => setExpandedBlocker(expandedBlocker === i ? null : i)}
                 >
                   {expandedBlocker === i ? "Hide Reason" : "Show Reason"}
                 </button>
               </div>
               {expandedBlocker === i && (
-                <div className="mt-2 bg-neutral-50 rounded-md p-2 text-sm text-neutral-700">
+                <div className="mt-4 bg-neutral-50 rounded-lg p-4 text-sm text-neutral-700 border border-neutral-200">
                   {b.reason}
                 </div>
               )}
@@ -332,28 +337,30 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       </div>
 
       {/* Status Change Log */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-        <h2 className="text-lg font-semibold text-neutral-700 mb-2">Status Change Log</h2>
-        <table className="min-w-full text-sm">
-          <thead>
-            <tr className="bg-neutral-200 text-neutral-700 text-left">
-              <th className="px-4 py-2">Timestamp</th>
-              <th className="px-4 py-2">Old Status</th>
-              <th className="px-4 py-2">New Status</th>
-              <th className="px-4 py-2">By</th>
-            </tr>
-          </thead>
-          <tbody>
-            {statusLog.map((log, i) => (
-              <tr key={i} className="border-t border-neutral-200 hover:bg-neutral-100">
-                <td className="px-4 py-2">{new Date(log.timestamp).toLocaleString()}</td>
-                <td className="px-4 py-2">{log.from}</td>
-                <td className="px-4 py-2">{log.to}</td>
-                <td className="px-4 py-2">{log.by}</td>
+      <div className="bg-white border border-neutral-200 rounded-xl shadow-sm p-8 mb-8">
+        <h2 className="text-xl font-semibold text-neutral-700 mb-6">Status Change Log</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="bg-neutral-100 text-neutral-700 text-left">
+                <th className="px-6 py-3 font-semibold">Timestamp</th>
+                <th className="px-6 py-3 font-semibold">Old Status</th>
+                <th className="px-6 py-3 font-semibold">New Status</th>
+                <th className="px-6 py-3 font-semibold">By</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {statusLog.map((log, i) => (
+                <tr key={i} className="border-t border-neutral-200 hover:bg-neutral-50">
+                  <td className="px-6 py-4">{new Date(log.timestamp).toLocaleString()}</td>
+                  <td className="px-6 py-4">{log.from}</td>
+                  <td className="px-6 py-4">{log.to}</td>
+                  <td className="px-6 py-4">{log.by}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
