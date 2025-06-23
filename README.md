@@ -1,4 +1,25 @@
-# React + Vite
+# Cricket Scoreboard - React + Vite
+
+## Production Deployment
+
+This app is deployed to Azure Static Web Apps:
+[https://ashy-mud-0cc393c0f-preview.eastus2.2.azurestaticapps.net](https://ashy-mud-0cc393c0f-preview.eastus2.2.azurestaticapps.net)
+
+### How to Deploy
+
+1. Build the app:
+   ```sh
+   npm run build
+   ```
+2. Deploy to Azure Static Web Apps:
+   ```sh
+   swa deploy dist --deployment-token <your-deployment-token>
+   ```
+   (Replace `<your-deployment-token>` with the value from Azure portal or CLI)
+
+### Client-side Routing
+
+This app uses React Router. The file `public/staticwebapp.config.json` ensures client-side routes work correctly on Azure Static Web Apps.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
