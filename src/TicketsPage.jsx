@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { saveAs } from "file-saver";
 
@@ -23,9 +23,31 @@ function parseTimeBlocked(str) {
 
 function toCSV(rows) {
   if (!rows.length) return '';
-  const keys = Object.keys(rows[0]);
+  // Always include Event_Log as the last column
+  const keys = [...Object.keys(rows[0]).filter(k => k !== 'Event_Log'), 'Event_Log'];
   const csv = [keys.join(",")].concat(
-    rows.map(row => keys.map(k => `"${(row[k] || "").replace(/"/g, '""')}"`).join(","))
+    rows.map(row => {
+      // Ensure Event_Log is a JSON string array
+      let eventLog = row.Event_Log;
+      if (!eventLog) {
+        // Try eventLogParsed if available
+        if (row.eventLogParsed && Array.isArray(row.eventLogParsed)) {
+          eventLog = JSON.stringify(row.eventLogParsed.map(ev => ({
+            ...ev,
+            // Convert timestamp to ISO string if it's a Date
+            timestamp: ev.timestamp instanceof Date ? ev.timestamp.toISOString() : ev.timestamp
+          })));
+        } else {
+          eventLog = '[]';
+        }
+      } else if (Array.isArray(eventLog)) {
+        eventLog = JSON.stringify(eventLog);
+      }
+      return keys.map(k => {
+        if (k === 'Event_Log') return `"${eventLog.replace(/"/g, '""')}"`;
+        return `"${(row[k] || "").replace(/"/g, '""')}"`;
+      }).join(",");
+    })
   ).join("\n");
   return csv;
 }
@@ -38,42 +60,62 @@ export default function TicketsPage({ tickets = [], loading }) {
 
   const uniqueOwners = Array.from(new Set(tickets.map(t => t.owner))).filter(Boolean);
 
-  // Filtering
-  let filteredTickets = tickets.filter(ticket => {
-    const matchesStatus = statusFilter === "" || ticket.status === statusFilter;
-    const matchesOwner = ownerFilter === "" || ticket.owner === ownerFilter;
-    const matchesSearch =
-      searchTerm.trim() === "" ||
-      (ticket.id && ticket.id.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (ticket.title && ticket.title.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesStatus && matchesOwner && matchesSearch;
-  });
-
-  // Sorting
-  if (sortConfig.key) {
-    filteredTickets = [...filteredTickets].sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
-      // Special handling for timeBlocked
-      if (sortConfig.key === "timeBlocked") {
-        aVal = parseTimeBlocked(aVal);
-        bVal = parseTimeBlocked(bVal);
-      }
-      // Fallback for undefined/null
-      if (aVal == null) aVal = '';
-      if (bVal == null) bVal = '';
-      if (typeof aVal === "number" && typeof bVal === "number") {
-        return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
-      } else {
-        return sortConfig.direction === "asc"
-          ? aVal.toString().localeCompare(bVal.toString())
-          : bVal.toString().localeCompare(aVal.toString());
-      }
+  // Filtering and sorting with memoization
+  const filteredTickets = useMemo(() => {
+    let result = tickets.filter(ticket => {
+      const matchesStatus = statusFilter === "" || ticket.status === statusFilter;
+      const matchesOwner = ownerFilter === "" || ticket.owner === ownerFilter;
+      const matchesSearch =
+        searchTerm.trim() === "" ||
+        (ticket.id && ticket.id.toString().toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (ticket.title && ticket.title.toLowerCase().includes(searchTerm.toLowerCase()));
+      return matchesStatus && matchesOwner && matchesSearch;
     });
-  }
+    // Sorting
+    if (sortConfig.key) {
+      result = [...result].sort((a, b) => {
+        let aVal = a[sortConfig.key];
+        let bVal = b[sortConfig.key];
+        // Special handling for calculated durations
+        if (sortConfig.key === "calculatedTotalTimeBlockedHours" || sortConfig.key === "calculatedTotalTimeInDevHours") {
+          aVal = typeof aVal === 'number' ? aVal : 0;
+          bVal = typeof bVal === 'number' ? bVal : 0;
+          return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+        }
+        // Fallback for undefined/null
+        if (aVal == null) aVal = '';
+        if (bVal == null) bVal = '';
+        if (typeof aVal === "number" && typeof bVal === "number") {
+          return sortConfig.direction === "asc" ? aVal - bVal : bVal - aVal;
+        } else {
+          return sortConfig.direction === "asc"
+            ? aVal.toString().localeCompare(bVal.toString())
+            : bVal.toString().localeCompare(aVal.toString());
+        }
+      });
+    }
+    return result;
+  }, [tickets, statusFilter, ownerFilter, searchTerm, sortConfig]);
 
   function handleExport() {
-    const csv = toCSV(filteredTickets);
+    // Ensure every ticket has Event_Log as a JSON string array
+    const ticketsWithEventLog = filteredTickets.map(ticket => {
+      let eventLog = ticket.Event_Log;
+      if (!eventLog) {
+        if (ticket.eventLogParsed && Array.isArray(ticket.eventLogParsed)) {
+          eventLog = JSON.stringify(ticket.eventLogParsed.map(ev => ({
+            ...ev,
+            timestamp: ev.timestamp instanceof Date ? ev.timestamp.toISOString() : ev.timestamp
+          })));
+        } else {
+          eventLog = '[]';
+        }
+      } else if (Array.isArray(eventLog)) {
+        eventLog = JSON.stringify(eventLog);
+      }
+      return { ...ticket, Event_Log: eventLog };
+    });
+    const csv = toCSV(ticketsWithEventLog);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     saveAs(blob, "tickets.csv");
   }
@@ -96,8 +138,8 @@ export default function TicketsPage({ tickets = [], loading }) {
     { key: "owner", label: "Owner" },
     { key: "blocked", label: "Blocked" },
     { key: "blockedBy", label: "Blocked By" },
-    { key: "timeInDev", label: "Time in Dev" },
-    { key: "timeBlocked", label: "Time Blocked" },
+    { key: "calculatedTotalTimeInDevHours", label: "Time in Dev" },
+    { key: "calculatedTotalTimeBlockedHours", label: "Time Blocked" },
   ];
 
   return (
@@ -173,13 +215,13 @@ export default function TicketsPage({ tickets = [], loading }) {
               {filteredTickets.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="text-center py-6 text-gray-500">
-                    No tickets found.
+                    No tickets found. Try adjusting your filters or search.
                   </td>
                 </tr>
               ) : (
                 filteredTickets.map(ticket => {
-                  const blockedHours = parseTimeBlocked(ticket.timeBlocked);
-                  const highlight = blockedHours > 72; // 3 days
+                  // Blocked >3 days highlight
+                  const highlight = ticket.currentBlockDurationHours > 72;
                   return (
                     <tr key={ticket.id} className={`border-t hover:bg-gray-50 ${highlight ? 'bg-red-100' : ''}`}>
                       <td className="px-4 py-2 font-mono">
@@ -194,9 +236,9 @@ export default function TicketsPage({ tickets = [], loading }) {
                       <td className="px-4 py-2">{ticket.owner}</td>
                       <td className="px-4 py-2">{ticket.blocked === "TRUE" || ticket.blocked === true ? "Y" : "N"}</td>
                       <td className="px-4 py-2">{ticket.blockedBy || "-"}</td>
-                      <td className="px-4 py-2">{ticket.timeInDev}</td>
+                      <td className="px-4 py-2">{typeof ticket.calculatedTotalTimeInDevHours === 'number' ? ticket.calculatedTotalTimeInDevHours + 'h' : '-'}</td>
                       <td className="px-4 py-2 flex items-center gap-2">
-                        {ticket.timeBlocked}
+                        {typeof ticket.calculatedTotalTimeBlockedHours === 'number' ? ticket.calculatedTotalTimeBlockedHours + 'h' : '-'}
                         {highlight && <span title="Blocked > 3 days" className="text-red-600">⚠️</span>}
                       </td>
                     </tr>

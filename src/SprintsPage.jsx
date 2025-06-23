@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell } from "recharts";
@@ -43,20 +43,21 @@ function getSprintStats(tickets) {
   let totalDevExBlocked = 0;
   const blockerFreq = {};
   tickets.forEach(ticket => {
-    const blocked = ticket.blocked === "TRUE" || ticket.blocked === true;
-    if (blocked) {
-      blockedCount++;
-      const hours = parseTimeBlocked(ticket.timeBlocked);
-      totalBlocked += hours;
-      const entity = ticket.blockedBy || "Unknown";
-      blockerFreq[entity] = (blockerFreq[entity] || 0) + 1;
-    }
-    const devHours = parseTimeDev(ticket.timeInDev);
+    const blocked = ticket.isBlocked;
+    // Use calculated fields
+    const blockedHours = ticket.calculatedTotalTimeBlockedHours || 0;
+    const devHours = ticket.calculatedTotalTimeInDevHours || 0;
+    if (blocked) blockedCount++;
+    totalBlocked += blockedHours;
     totalDev += devHours;
     if (!blocked) totalDevExBlocked += devHours;
+    const entity = ticket.blockedBy || "Unknown";
+    if (blocked) blockerFreq[entity] = (blockerFreq[entity] || 0) + 1;
   });
   const mostFrequentBlocker = Object.entries(blockerFreq).sort((a, b) => b[1] - a[1])[0]?.[0] || "-";
   const percentBlocked = total > 0 ? Math.round((blockedCount / total) * 100) : 0;
+  // Efficiency: totalDev / (totalDev + totalBlocked)
+  const efficiency = (totalDev + totalBlocked) > 0 ? Math.round((totalDev / (totalDev + totalBlocked)) * 100) : 0;
   const avgDevExBlocked = total - blockedCount > 0 ? Math.round((totalDevExBlocked / (total - blockedCount)) * 10) / 10 : 0;
   return {
     total,
@@ -66,6 +67,7 @@ function getSprintStats(tickets) {
     totalBlocked,
     totalDev,
     avgDevExBlocked,
+    efficiency,
   };
 }
 
@@ -92,8 +94,9 @@ export default function SprintsPage({ tickets = [], loading }) {
   const [sprintSearch, setSprintSearch] = useState("");
   const [ticketSort, setTicketSort] = useState({ key: null, direction: "asc" });
 
-  const sprints = groupBySprint(tickets);
-  let sprintNames = Object.keys(sprints);
+  // Memoize sprints and sprintNames
+  const sprints = useMemo(() => groupBySprint(tickets), [tickets]);
+  let sprintNames = useMemo(() => Object.keys(sprints), [sprints]);
   if (sprintSearch.trim()) {
     sprintNames = sprintNames.filter(s => s.toLowerCase().includes(sprintSearch.toLowerCase()));
   }
@@ -209,84 +212,97 @@ export default function SprintsPage({ tickets = [], loading }) {
               })()}
             </div>
           )}
-          {sprintNames.map(sprint => {
-            const sprintTickets = sprints[sprint];
-            const stats = getSprintStats(sprintTickets);
-            // Efficiency Score
-            const efficiency = (stats.totalDev + stats.totalBlocked) > 0 ? Math.round((stats.totalDev / (stats.totalDev + stats.totalBlocked)) * 100) : 0;
-            // Ticket Table Sorting
-            let sortedTickets = [...sprintTickets];
-            if (expandedSprint === sprint && ticketSort.key) {
-              sortedTickets.sort((a, b) => {
-                let aVal = a[ticketSort.key];
-                let bVal = b[ticketSort.key];
-                if (ticketSort.key === "timeBlocked") {
-                  aVal = parseTimeBlocked(aVal);
-                  bVal = parseTimeBlocked(bVal);
+          {sprintNames.length === 0 ? (
+            <div className="text-gray-500 text-center py-8">No sprints found. Try adjusting your filters or search.</div>
+          ) : (
+            sprintNames.map(sprint => {
+              const sprintTickets = sprints[sprint];
+              const stats = getSprintStats(sprintTickets);
+              // Ticket Table Sorting
+              let sortedTickets = useMemo(() => {
+                let arr = [...sprintTickets];
+                if (expandedSprint === sprint && ticketSort.key) {
+                  arr.sort((a, b) => {
+                    let aVal = a[ticketSort.key];
+                    let bVal = b[ticketSort.key];
+                    if (ticketSort.key === "timeBlocked") {
+                      aVal = parseTimeBlocked(aVal);
+                      bVal = parseTimeBlocked(bVal);
+                    }
+                    if (typeof aVal === "number" && typeof bVal === "number") {
+                      return ticketSort.direction === "asc" ? aVal - bVal : bVal - aVal;
+                    } else {
+                      return ticketSort.direction === "asc"
+                        ? (aVal || "").toString().localeCompare((bVal || "").toString())
+                        : (bVal || "").toString().localeCompare((aVal || "").toString());
+                    }
+                  });
                 }
-                if (typeof aVal === "number" && typeof bVal === "number") {
-                  return ticketSort.direction === "asc" ? aVal - bVal : bVal - aVal;
-                } else {
-                  return ticketSort.direction === "asc"
-                    ? (aVal || "").toString().localeCompare((bVal || "").toString())
-                    : (bVal || "").toString().localeCompare((aVal || "").toString());
-                }
-              });
-            }
-            return (
-              <div key={sprint} className="bg-white rounded shadow p-4">
-                <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedSprint(expandedSprint === sprint ? null : sprint)}>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold">{sprint}</h2>
-                    {getEfficiencyBadge(efficiency)}
-                  </div>
-                  <button className="text-blue-600 hover:underline">{expandedSprint === sprint ? "Hide" : "Show"} Details</button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-                  <div><span className="font-semibold">Tickets Blocked:</span> {stats.blockedCount}</div>
-                  <div><span className="font-semibold">% Time Blocked:</span> {stats.percentBlocked}%</div>
-                  <div><span className="font-semibold">Most Frequent Blocker:</span> {stats.mostFrequentBlocker}</div>
-                  <div><span className="font-semibold">Total Time Blocked:</span> {stats.totalBlocked}h</div>
-                </div>
-                {expandedSprint === sprint && (
-                  <div className="mt-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold">Tickets</h3>
-                      <button onClick={() => handleExport(sprintTickets)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Export CSV</button>
+                return arr;
+              }, [sprintTickets, expandedSprint, ticketSort, sprint]);
+              return (
+                <div key={sprint} className="bg-white rounded shadow p-4">
+                  <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedSprint(expandedSprint === sprint ? null : sprint)}>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-semibold">{sprint}</h2>
+                      {getEfficiencyBadge(stats.efficiency)}
                     </div>
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full text-sm">
-                        <thead>
-                          <tr className="bg-gray-100 text-left">
-                            <th className="px-4 py-2">Ticket ID</th>
-                            <th className="px-4 py-2">Owner</th>
-                            <th className="px-4 py-2 cursor-pointer select-none" onClick={e => { e.stopPropagation(); setTicketSort(prev => ({ key: "status", direction: prev.key === "status" && prev.direction === "asc" ? "desc" : "asc" })); }}>Status {ticketSort.key === "status" && (ticketSort.direction === "asc" ? "▲" : "▼")}</th>
-                            <th className="px-4 py-2 cursor-pointer select-none" onClick={e => { e.stopPropagation(); setTicketSort(prev => ({ key: "timeBlocked", direction: prev.key === "timeBlocked" && prev.direction === "asc" ? "desc" : "asc" })); }}>Time Blocked {ticketSort.key === "timeBlocked" && (ticketSort.direction === "asc" ? "▲" : "▼")}</th>
-                            <th className="px-4 py-2">Time in Dev</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sortedTickets.map(ticket => {
-                            const blockedHours = parseTimeBlocked(ticket.timeBlocked);
-                            const highlight = blockedHours > 72;
-                            return (
-                              <tr key={ticket.id} className={`border-t hover:bg-gray-50 ${highlight ? 'bg-red-100' : ''}`}>
-                                <td className="px-4 py-2 font-mono">{ticket.id}</td>
-                                <td className="px-4 py-2">{ticket.owner}</td>
-                                <td className="px-4 py-2">{ticket.status}</td>
-                                <td className="px-4 py-2">{ticket.timeBlocked}</td>
-                                <td className="px-4 py-2">{ticket.timeInDev}</td>
+                    <button className="text-blue-600 hover:underline">{expandedSprint === sprint ? "Hide" : "Show"} Details</button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                    <div><span className="font-semibold">Tickets Blocked:</span> {stats.blockedCount}</div>
+                    <div><span className="font-semibold">% Time Blocked:</span> {stats.percentBlocked}%</div>
+                    <div><span className="font-semibold">Most Frequent Blocker:</span> {stats.mostFrequentBlocker}</div>
+                    <div><span className="font-semibold">Total Time Blocked:</span> {stats.totalBlocked}h</div>
+                    <div><span className="font-semibold">Total Dev Hours:</span> {stats.totalDev}h</div>
+                  </div>
+                  {expandedSprint === sprint && (
+                    <div className="mt-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold">Tickets</h3>
+                        <button onClick={() => handleExport(sortedTickets)} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Export CSV</button>
+                      </div>
+                      <div className="overflow-x-auto">
+                        {sortedTickets.length === 0 ? (
+                          <div className="text-gray-500 text-center py-8">No tickets in this sprint.</div>
+                        ) : (
+                          <table className="min-w-full text-sm">
+                            <thead>
+                              <tr className="bg-gray-100 text-left">
+                                <th className="px-4 py-2">Ticket ID</th>
+                                <th className="px-4 py-2">Owner</th>
+                                <th className="px-4 py-2 cursor-pointer select-none" onClick={e => { e.stopPropagation(); setTicketSort(prev => ({ key: "status", direction: prev.key === "status" && prev.direction === "asc" ? "desc" : "asc" })); }}>Status {ticketSort.key === "status" && (ticketSort.direction === "asc" ? "▲" : "▼")}</th>
+                                <th className="px-4 py-2">Dev Hours</th>
+                                <th className="px-4 py-2">Blocked Hours</th>
+                                <th className="px-4 py-2">Cycle Time</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                            </thead>
+                            <tbody>
+                              {sortedTickets.map(ticket => {
+                                const devH = ticket.calculatedTotalTimeInDevHours;
+                                const blockedH = ticket.calculatedTotalTimeBlockedHours;
+                                const cycleH = ticket.totalCycleTimeHours;
+                                return (
+                                  <tr key={ticket.id} className={`border-t hover:bg-gray-50`}>
+                                    <td className="px-4 py-2 font-mono">{ticket.id}</td>
+                                    <td className="px-4 py-2">{ticket.owner}</td>
+                                    <td className="px-4 py-2">{ticket.status}</td>
+                                    <td className="px-4 py-2">{devH != null ? devH + 'h' : '-'}</td>
+                                    <td className="px-4 py-2">{blockedH != null ? blockedH + 'h' : '-'}</td>
+                                    <td className="px-4 py-2">{cycleH != null ? cycleH + 'h' : '-'}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                  )}
+                </div>
+              );
+            })
+          )}
         </div>
       )}
     </div>

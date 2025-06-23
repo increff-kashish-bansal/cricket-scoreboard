@@ -72,27 +72,38 @@ export default function PeoplePage({ tickets = [], loading }) {
   const devStats = {};
   const blockerStats = {};
   ticketsToUse.forEach(ticket => {
+    const eventLog = ticket.eventLogParsed || [];
     // Developers: tickets owned
     if (ticket.owner) {
       if (!devStats[ticket.owner]) {
         devStats[ticket.owner] = { name: ticket.owner, tickets: 0, timeHeld: 0, blocksResolved: 0, blocksCaused: 0, closedBySprint: {}, team: ticket.team };
       }
       devStats[ticket.owner].tickets += 1;
-      devStats[ticket.owner].timeHeld += parseTime(ticket.timeInDev);
-      if (ticket.status === "Done") {
-        devStats[ticket.owner].blocksResolved += 1;
-        // Track tickets closed per sprint for sparkline
-        const sprint = ticket.sprint || "No Sprint";
-        devStats[ticket.owner].closedBySprint[sprint] = (devStats[ticket.owner].closedBySprint[sprint] || 0) + 1;
-      }
+      devStats[ticket.owner].timeHeld += ticket.calculatedTotalTimeInDevHours || 0;
+      // blocksResolved: count 'unblocked' events in eventLogParsed where event.user/by matches owner
+      devStats[ticket.owner].blocksResolved += eventLog.filter(ev => (ev.status === 'In Progress' || ev.status === 'Unblocked') && (ev.by === ticket.owner || ev.user === ticket.owner)).length;
+      // blocksCaused: count 'Blocked' events in eventLogParsed where ev.blockedBy/by/user matches owner
+      devStats[ticket.owner].blocksCaused += eventLog.filter(ev => ev.status === 'Blocked' && (ev.blockedBy === ticket.owner || ev.by === ticket.owner || ev.user === ticket.owner)).length;
+      // Sparkline: count 'Done' events per sprint
+      eventLog.forEach(ev => {
+        if (ev.status === 'Done') {
+          const sprint = ticket.sprintName || ticket.sprint || 'No Sprint';
+          devStats[ticket.owner].closedBySprint[sprint] = (devStats[ticket.owner].closedBySprint[sprint] || 0) + 1;
+        }
+      });
     }
-    // Blockers: blocks caused
-    if (ticket.blockedBy) {
-      if (!blockerStats[ticket.blockedBy]) {
-        blockerStats[ticket.blockedBy] = { name: ticket.blockedBy, tickets: 0, timeHeld: 0, blocksResolved: 0, blocksCaused: 0, team: ticket.team };
+    // Blockers: blocks caused (across all tickets)
+    eventLog.forEach(ev => {
+      if (ev.status === 'Blocked') {
+        const blocker = ev.blockedBy || ev.by || ev.user;
+        if (blocker) {
+          if (!blockerStats[blocker]) {
+            blockerStats[blocker] = { name: blocker, tickets: 0, timeHeld: 0, blocksResolved: 0, blocksCaused: 0, team: ticket.team };
+          }
+          blockerStats[blocker].blocksCaused += 1;
+        }
       }
-      blockerStats[ticket.blockedBy].blocksCaused += 1;
-    }
+    });
     // For blockers, also show tickets/time held if they were also owners
     if (ticket.blockedBy && devStats[ticket.blockedBy]) {
       blockerStats[ticket.blockedBy].tickets = devStats[ticket.blockedBy].tickets;
@@ -156,8 +167,8 @@ export default function PeoplePage({ tickets = [], loading }) {
     const tickets = getPersonTickets(person);
     let totalDev = 0, totalBlocked = 0;
     tickets.forEach(t => {
-      totalDev += parseTime(t.timeInDev);
-      totalBlocked += parseTime(t.timeBlocked);
+      totalDev += t.calculatedTotalTimeInDevHours || 0;
+      totalBlocked += t.calculatedTotalTimeBlockedHours || 0;
     });
     return { totalDev, totalBlocked };
   }
@@ -337,9 +348,9 @@ export default function PeoplePage({ tickets = [], loading }) {
                         <tr key={t.id} className="border-t">
                           <td className="px-2 py-1 font-mono">{t.id}</td>
                           <td className="px-2 py-1">{t.status}</td>
-                          <td className="px-2 py-1">{t.timeInDev}</td>
-                          <td className="px-2 py-1">{t.timeBlocked}</td>
-                          <td className="px-2 py-1">{t.sprint || "-"}</td>
+                          <td className="px-2 py-1">{t.calculatedTotalTimeInDevHours != null ? t.calculatedTotalTimeInDevHours + 'h' : '-'}</td>
+                          <td className="px-2 py-1">{t.calculatedTotalTimeBlockedHours != null ? t.calculatedTotalTimeBlockedHours + 'h' : '-'}</td>
+                          <td className="px-2 py-1">{t.sprintName || t.sprint || '-'}</td>
                         </tr>
                       ))}
                     </tbody>

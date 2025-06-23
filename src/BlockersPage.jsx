@@ -61,45 +61,67 @@ export default function BlockersPage({ tickets = [], loading }) {
   const blockerStats = {};
   let totalBlockedHours = 0;
   ticketsToUse.forEach(ticket => {
-    if (ticket.blocked === "TRUE" || ticket.blocked === true) {
-      const entity = ticket.blockedBy || "Unknown";
-      const hours = parseTimeBlocked(ticket.timeBlocked);
-      const sprint = ticket.sprint || "No Sprint";
-      totalBlockedHours += hours;
+    const eventLog = ticket.eventLogParsed || [];
+    const sprint = ticket.sprintName || ticket.sprint || "No Sprint";
+    // Find all block events in eventLogParsed
+    const blockEvents = eventLog.filter(ev => ev.status === 'Blocked');
+    blockEvents.forEach(ev => {
+      const entity = ticket.blockedBy || ev.blockedBy || ev.by || "Unknown";
       if (!blockerStats[entity]) {
         blockerStats[entity] = {
           entity,
           count: 0,
           totalHours: 0,
           maxHours: 0,
-          sumHours: 0,
+          blockDurations: [],
           mostRecent: null,
           mostRecentDate: null,
           sprints: new Set(),
-          ticketIds: [],
+          ticketIds: new Set(),
+          blockTimestamps: [],
+          blockSprints: new Set(),
         };
       }
+      // Find the end of this block (next non-blocked event or end of log)
+      let blockEnd = null;
+      for (let i = eventLog.indexOf(ev) + 1; i < eventLog.length; i++) {
+        if (eventLog[i].status !== 'Blocked') {
+          blockEnd = eventLog[i].timestamp;
+          break;
+        }
+      }
+      // If still blocked, use now
+      if (!blockEnd) blockEnd = ticket.status === 'Blocked' ? new Date() : null;
+      let durationH = null;
+      if (blockEnd && ev.timestamp) {
+        durationH = Math.max(1, Math.round((new Date(blockEnd) - new Date(ev.timestamp)) / 36e5));
+      }
+      if (durationH) {
+        blockerStats[entity].blockDurations.push(durationH);
+        blockerStats[entity].totalHours += durationH;
+        blockerStats[entity].maxHours = Math.max(blockerStats[entity].maxHours, durationH);
+        totalBlockedHours += durationH;
+      }
       blockerStats[entity].count += 1;
-      blockerStats[entity].totalHours += hours;
-      blockerStats[entity].sumHours += hours;
-      blockerStats[entity].maxHours = Math.max(blockerStats[entity].maxHours, hours);
       blockerStats[entity].sprints.add(sprint);
-      blockerStats[entity].ticketIds.push(ticket.id);
-      // Most recent ticket (by some date field, fallback to id)
-      const ticketDate = ticket.updatedAt || ticket.resolvedAt || ticket.completedAt || ticket.date || ticket.id;
-      if (!blockerStats[entity].mostRecentDate || ticketDate > blockerStats[entity].mostRecentDate) {
-        blockerStats[entity].mostRecentDate = ticketDate;
+      blockerStats[entity].ticketIds.add(ticket.id);
+      blockerStats[entity].blockTimestamps.push(ev.timestamp);
+      blockerStats[entity].blockSprints.add(sprint);
+      // Most recent block event timestamp
+      if (!blockerStats[entity].mostRecentDate || (ev.timestamp && ev.timestamp > blockerStats[entity].mostRecentDate)) {
+        blockerStats[entity].mostRecentDate = ev.timestamp;
         blockerStats[entity].mostRecent = ticket;
       }
-    }
+    });
   });
 
   // Prepare table data
   let tableData = Object.values(blockerStats).map(b => ({
     ...b,
-    avgHours: b.count ? Math.round((b.sumHours / b.count) * 10) / 10 : 0,
+    avgHours: b.blockDurations.length ? Math.round((b.totalHours / b.blockDurations.length) * 10) / 10 : 0,
     sprints: Array.from(b.sprints),
-    repeatOffender: b.count > 3 && b.sprints.length > 1,
+    repeatOffender: b.count > 3 && b.blockSprints.size > 1,
+    ticketIds: Array.from(b.ticketIds),
   }));
 
   // --- FILTERING ---

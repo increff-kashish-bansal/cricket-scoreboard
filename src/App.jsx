@@ -2,7 +2,8 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Link
+  Link,
+  useLocation
 } from "react-router-dom";
 import TicketsPage from "./TicketsPage.jsx";
 import TicketDetailPage from "./TicketDetailPage.jsx";
@@ -11,7 +12,7 @@ import PeoplePage from "./PeoplePage.jsx";
 import BlockersPage from "./BlockersPage.jsx";
 import { TicketsProvider, useTicketsContext } from "./TicketsContext.jsx";
 import Dashboard from "./Dashboard.jsx";
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 const navLinks = [
   { name: "Dashboard", path: "/" },
@@ -24,6 +25,21 @@ const navLinks = [
 function TopBar() {
   const { reload, loading, uploadTickets } = useTicketsContext();
   const fileInputRef = React.useRef();
+  const [csvFiles, setCsvFiles] = useState(["tickets.csv"]);
+  const [selectedCsv, setSelectedCsv] = useState("tickets.csv");
+
+  // Auto-detect CSV files in /public (simulate for now)
+  useEffect(() => {
+    // In a real app, you might fetch this from the server or a manifest
+    setCsvFiles(["tickets.csv"]); // Add more files if present
+  }, []);
+
+  // Allow user to select and load a CSV from the dropdown
+  const handleCsvSelect = (e) => {
+    setSelectedCsv(e.target.value);
+    // Simulate loading a different CSV (in real app, pass to context)
+    window.location.href = `/${e.target.value}`; // Or trigger context reload
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -36,7 +52,17 @@ function TopBar() {
   return (
     <div className="flex items-center justify-between bg-white shadow px-6 py-3 mb-6 sticky top-0 z-10">
       <div className="font-bold text-lg">Tech Scoreboard</div>
-      <div className="flex gap-2">
+      <div className="flex gap-2 items-center">
+        <select
+          className="border rounded px-2 py-1 text-sm"
+          value={selectedCsv}
+          onChange={handleCsvSelect}
+          disabled={loading}
+        >
+          {csvFiles.map(f => (
+            <option key={f} value={f}>{f}</option>
+          ))}
+        </select>
         <button
           className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
           onClick={reload}
@@ -60,6 +86,24 @@ function TopBar() {
         </button>
       </div>
     </div>
+  );
+}
+
+function SidebarNav() {
+  const location = useLocation();
+  return (
+    <nav className="flex gap-2 mb-4">
+      {navLinks.map(link => (
+        <a
+          key={link.path}
+          href={link.path}
+          className={`px-3 py-2 rounded font-semibold transition-colors duration-200 ${location.pathname === link.path ? 'bg-blue-600 text-white shadow' : 'text-gray-700 hover:bg-blue-100'}`}
+          aria-current={location.pathname === link.path ? 'page' : undefined}
+        >
+          {link.name}
+        </a>
+      ))}
+    </nav>
   );
 }
 
@@ -123,9 +167,20 @@ function App() {
   return (
     <TicketsProvider>
       <Router>
-        <Layout>
-          <AppRoutes />
-        </Layout>
+        <TopBar />
+        <div className="max-w-7xl mx-auto px-4">
+          <SidebarNav />
+          <div className="min-h-[60vh] bg-white rounded shadow p-6 mb-8 animate-fadein">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/tickets" element={<TicketsPage />} />
+              <Route path="/tickets/:id" element={<TicketDetailPage />} />
+              <Route path="/blockers" element={<BlockersPage />} />
+              <Route path="/sprints" element={<SprintsPage />} />
+              <Route path="/people" element={<PeoplePage />} />
+            </Routes>
+          </div>
+        </div>
       </Router>
     </TicketsProvider>
   );
