@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { saveAs } from "file-saver";
-import { ArrowPathIcon, InformationCircleIcon } from "@heroicons/react/24/solid";
+import { ArrowPathIcon, InformationCircleIcon, EyeIcon } from "@heroicons/react/24/solid";
+import { Gantt, ViewMode } from 'gantt-task-react';
+import 'gantt-task-react/dist/index.css';
 
 const statuses = ["To Do", "In Progress", "Blocked", "Done"];
 
@@ -73,6 +75,8 @@ export default function TicketsPage({ tickets = [], loading }) {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 25;
+  const [quickViewTicketId, setQuickViewTicketId] = useState(null);
+  const [quickViewAnchor, setQuickViewAnchor] = useState(null);
 
   const uniqueOwners = Array.from(new Set(tickets.map(t => t.owner))).filter(Boolean);
 
@@ -160,6 +164,79 @@ export default function TicketsPage({ tickets = [], loading }) {
     { key: "calculatedTotalTimeInDevHours", label: "Time in Dev" },
     { key: "calculatedTotalTimeBlockedHours", label: "Time Blocked" },
   ];
+
+  // Helper: transform event log to Gantt tasks (from TicketDetailPage)
+  function transformEventLogToGanttTasks(eventLogParsed, ticketDetails) {
+    const statusColors = {
+      'To Do': '#2563eb',
+      'Backlog': '#64748b',
+      'In Progress': '#f59e42',
+      'In Review': '#a21caf',
+      'QA': '#059669',
+      'Blocked': '#dc2626',
+      'Done': '#22c55e',
+      'Deployed': '#0ea5e9',
+      'Unblocked': '#22c55e',
+      'default': '#bdbdbd',
+    };
+    const blockedBarFill = '#991B1B';
+    const criticalBlockerFill = '#ff1744';
+    const tasks = [];
+    const blockedTasks = [];
+    for (let i = 0; i < eventLogParsed.length; i++) {
+      const ev = eventLogParsed[i];
+      if (!ev.status || !ev.timestamp) continue;
+      const start = ev.timestamp;
+      let end = null;
+      if (i < eventLogParsed.length - 1) {
+        end = eventLogParsed[i + 1].timestamp;
+      } else {
+        end = (ticketDetails.status === 'Done' || ticketDetails.status === 'Deployed') ? null : new Date();
+      }
+      if (!start || isNaN(start.getTime())) continue;
+      if (end && (isNaN(end.getTime()) || end <= start)) continue;
+      const phaseStatus = ev.status;
+      const color = statusColors[phaseStatus] || statusColors['default'];
+      const ganttEnd = end || new Date();
+      let name = phaseStatus;
+      let durationMs = null;
+      if (phaseStatus === 'Blocked') {
+        durationMs = new Date(ganttEnd) - new Date(start);
+      }
+      const task = {
+        id: `${ticketDetails.id}-${i}-${phaseStatus}`,
+        name,
+        start: start,
+        end: ganttEnd,
+        type: 'task',
+        progress: end ? 100 : 0,
+        dependencies: [],
+        backgroundColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
+        barColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
+        barProgressColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
+        progressColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
+        blockedBy: ev.blockedBy,
+        user: ev.user,
+        reason: ev.reason || ev.note,
+        durationMs,
+      };
+      if (phaseStatus === 'Blocked') blockedTasks.push({ idx: tasks.length, durationMs: durationMs || 0 });
+      tasks.push(task);
+    }
+    if (blockedTasks.length > 0) {
+      const maxIdx = blockedTasks.reduce((maxI, t, i, arr) => t.durationMs > arr[maxI].durationMs ? i : maxI, 0);
+      const criticalIdx = blockedTasks[maxIdx].idx;
+      if (tasks[criticalIdx]) {
+        tasks[criticalIdx].isCriticalBlocker = true;
+        tasks[criticalIdx].backgroundColor = criticalBlockerFill;
+        tasks[criticalIdx].barColor = criticalBlockerFill;
+        tasks[criticalIdx].barProgressColor = criticalBlockerFill;
+        tasks[criticalIdx].progressColor = criticalBlockerFill;
+        tasks[criticalIdx].customClass = 'gantt-critical-blocker';
+      }
+    }
+    return tasks;
+  }
 
   return (
     <div>
@@ -264,11 +341,53 @@ export default function TicketsPage({ tickets = [], loading }) {
                       key={ticket.id}
                       className={`border-t border-neutral-200 hover:bg-neutral-100 ${idx % 2 === 1 ? 'even:bg-neutral-50' : ''} ${highlight ? 'bg-red-100' : ''}`}
                     >
-                      <td className="px-4 py-2 font-mono">
+                      <td className="px-4 py-2 font-mono relative group">
                         <Link to={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline flex items-center gap-1" title="View Timeline" aria-label="View Timeline">
                           {ticket.id}
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5V3m-8 8v6a2 2 0 002 2h4a2 2 0 002-2v-6" /></svg>
                         </Link>
+                        {/* Eye icon for quick view */}
+                        <button
+                          type="button"
+                          className="ml-1 p-1 rounded hover:bg-neutral-200 focus:outline-none focus:ring-2 focus:ring-primary absolute top-1/2 -translate-y-1/2 right-0"
+                          onMouseEnter={e => { setQuickViewTicketId(ticket.id); setQuickViewAnchor(e.currentTarget); }}
+                          onMouseLeave={() => setQuickViewTicketId(null)}
+                          tabIndex={0}
+                          aria-label="Quick View"
+                        >
+                          <EyeIcon className="w-4 h-4 text-neutral-500" />
+                        </button>
+                        {/* Popover for quick view */}
+                        {quickViewTicketId === ticket.id && (
+                          <div
+                            className="z-50 absolute left-full top-1/2 -translate-y-1/2 ml-2 bg-white border border-neutral-200 rounded-lg shadow-lg p-4 min-w-[260px] max-w-xs text-xs flex flex-col gap-2 animate-fadein"
+                            onMouseEnter={() => setQuickViewTicketId(ticket.id)}
+                            onMouseLeave={() => setQuickViewTicketId(null)}
+                          >
+                            <div className="font-semibold text-neutral-800 mb-1">{ticket.title || `Ticket #${ticket.id}`}</div>
+                            <div className="text-neutral-600 mb-1">{ticket.description || <span className="italic text-neutral-400">No description</span>}</div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusPillClass(ticket.status)}`}>{ticket.status}</span>
+                              <span className="text-neutral-500">Owner:</span> <span className="font-semibold text-neutral-700">{ticket.owner || '-'}</span>
+                            </div>
+                            {/* Mini Gantt chart */}
+                            <div className="w-full h-16 bg-neutral-50 rounded border border-neutral-100 overflow-x-auto">
+                              <Gantt
+                                tasks={transformEventLogToGanttTasks(ticket.eventLogParsed || [], ticket)}
+                                viewMode={ViewMode.Day}
+                                fontFamily="Inter, system-ui, sans-serif"
+                                fontSize={10}
+                                barHeight={12}
+                                columnWidth={24}
+                                listCellWidth={0}
+                                barCornerRadius={3}
+                                TooltipContent={null}
+                                // Hide grid lines and extras for minimal look
+                                style={{ minWidth: 180, height: 48 }}
+                              />
+                            </div>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-2">{ticket.title}</td>
                       <td className="px-4 py-2">

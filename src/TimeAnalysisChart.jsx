@@ -6,8 +6,29 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
  * Props:
  *   - sprints: { [sprintName]: Ticket[] }
  *   - sprintNames: string[] (chronological order)
+ *   - filter: { sprint: string }
+ *   - onSprintClick: (sprint: string) => void
  */
-function TimeAnalysisChart({ sprints, sprintNames }) {
+
+// Custom ActiveDot component for highlighting
+function CustomActiveDot(props) {
+  const { cx, cy, payload, filter } = props;
+  const isActive = filter && filter.sprint === payload.sprint;
+  if (!cx || !cy) return null;
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={isActive ? 10 : 6}
+      fill={isActive ? '#2563eb' : '#fff'}
+      stroke={isActive ? '#1e40af' : '#2563eb'}
+      strokeWidth={isActive ? 3 : 2}
+      style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+    />
+  );
+}
+
+function TimeAnalysisChart({ sprints, sprintNames, filter, onSprintClick }) {
   // Prepare data for the chart
   const data = sprintNames.map(sprint => {
     const tickets = sprints[sprint] || [];
@@ -28,6 +49,9 @@ function TimeAnalysisChart({ sprints, sprintNames }) {
           <AreaChart
             data={data}
             margin={{ top: 24, right: 32, left: 32, bottom: 24 }}
+            onClick={e => {
+              if (onSprintClick && e && e.activeLabel) onSprintClick(e.activeLabel);
+            }}
           >
             <defs>
               <linearGradient id="colorDev" x1="0" y1="0" x2="0" y2="1">
@@ -63,7 +87,7 @@ function TimeAnalysisChart({ sprints, sprintNames }) {
               stroke="#2563eb"
               fill="url(#colorDev)"
               name="Total Time in Dev"
-              activeDot={{ r: 6 }}
+              activeDot={props => <CustomActiveDot {...props} filter={filter} />}
             />
             <Area
               type="monotone"
@@ -72,7 +96,7 @@ function TimeAnalysisChart({ sprints, sprintNames }) {
               stroke="#f87171"
               fill="url(#colorBlocked)"
               name="Total Time Blocked"
-              activeDot={{ r: 6 }}
+              activeDot={props => <CustomActiveDot {...props} filter={filter} />}
             />
           </AreaChart>
         </ResponsiveContainer>

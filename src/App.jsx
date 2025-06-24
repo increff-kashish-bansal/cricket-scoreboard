@@ -16,6 +16,7 @@ import Dashboard from "./Dashboard.jsx";
 import React, { useEffect, useState } from "react";
 import { ArrowPathIcon } from "@heroicons/react/24/solid";
 import { Toaster } from 'react-hot-toast';
+import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
 
 const navLinks = [
   { name: "Dashboard", path: "/" },
@@ -187,17 +188,169 @@ function AppRoutes() {
   );
 }
 
+function CommandPalette({ tickets, onOpenTicket, people, onOpenPerson, sprints, onOpenSprint, open, onClose }) {
+  const [query, setQuery] = React.useState("");
+  const [results, setResults] = React.useState([]);
+  const inputRef = React.useRef();
+
+  React.useEffect(() => {
+    if (open && inputRef.current) {
+      inputRef.current.focus();
+    }
+    if (!open) setQuery("");
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!query) {
+      setResults([]);
+      return;
+    }
+    const q = query.toLowerCase();
+    const ticketResults = tickets.filter(t => t.id?.toLowerCase().includes(q) || t.title?.toLowerCase().includes(q)).map(t => ({
+      type: "ticket",
+      id: t.id,
+      title: t.title,
+      status: t.status,
+      owner: t.owner,
+      ticket: t,
+    }));
+    const peopleResults = people.filter(p => p.toLowerCase().includes(q)).map(name => ({
+      type: "person",
+      name,
+    }));
+    const sprintResults = sprints.filter(s => s.toLowerCase().includes(q)).map(name => ({
+      type: "sprint",
+      name,
+    }));
+    setResults([...ticketResults, ...peopleResults, ...sprintResults]);
+  }, [query, tickets, people, sprints]);
+
+  function handleSelect(result) {
+    if (result.type === "ticket") {
+      onOpenTicket(result.ticket);
+    } else if (result.type === "person") {
+      onOpenPerson(result.name);
+    } else if (result.type === "sprint") {
+      onOpenSprint(result.name);
+    }
+    onClose();
+  }
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white rounded-lg shadow-xl p-4 w-full max-w-lg relative animate-fadein">
+        <button className="absolute top-3 right-3 text-neutral-500 hover:text-neutral-700 text-2xl" onClick={onClose} aria-label="Close">&times;</button>
+        <div className="flex items-center gap-2 mb-2">
+          <MagnifyingGlassIcon className="w-5 h-5 text-neutral-400" />
+          <input
+            ref={inputRef}
+            className="w-full px-2 py-2 border-b border-neutral-200 focus:outline-none text-lg"
+            placeholder="Search tickets, people, sprints..."
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === "Escape") onClose();
+              if (e.key === "Enter" && results.length > 0) handleSelect(results[0]);
+            }}
+          />
+        </div>
+        <div className="max-h-80 overflow-y-auto mt-2">
+          {results.length === 0 ? (
+            <div className="text-neutral-400 text-center py-6">No results</div>
+          ) : (
+            <ul>
+              {results.map((r, i) => (
+                <li key={i} className="px-3 py-2 hover:bg-blue-50 rounded cursor-pointer flex items-center gap-2" onClick={() => handleSelect(r)}>
+                  {r.type === "ticket" && <span className="font-mono text-blue-700">#{r.id}</span>}
+                  {r.type === "ticket" && <span className="text-neutral-700">{r.title}</span>}
+                  {r.type === "person" && <span className="text-green-700 font-semibold">👤 {r.name}</span>}
+                  {r.type === "sprint" && <span className="text-purple-700 font-semibold">🏁 {r.name}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function App() {
+  return (
+    <TicketsProvider>
+      <AppWithContext />
+    </TicketsProvider>
+  );
+}
+
+function AppWithContext() {
+  const { tickets, loading } = useTicketsContext();
+  const [commandOpen, setCommandOpen] = React.useState(false);
+  const [modal, setModal] = React.useState(null); // { type, data }
+
+  // Gather people and sprints for search
+  const people = React.useMemo(() => Array.from(new Set(tickets.map(t => t.owner).filter(Boolean))), [tickets]);
+  const sprints = React.useMemo(() => Array.from(new Set(tickets.map(t => t.sprintName || t.sprint).filter(Boolean))), [tickets]);
+
+  // Keyboard shortcut: Ctrl+K
+  React.useEffect(() => {
+    function handleKeyDown(e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen(o => !o);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  function handleOpenTicket(ticket) {
+    setModal({ type: "ticket", data: ticket });
+  }
+  function handleOpenPerson(name) {
+    setModal({ type: "person", data: name });
+  }
+  function handleOpenSprint(name) {
+    setModal({ type: "sprint", data: name });
+  }
+  function handleCloseModal() {
+    setModal(null);
+  }
+
   return (
     <>
       <Toaster position="top-right" />
-      <TicketsProvider>
-        <Router>
-          <Layout>
-            <AppRoutes />
-          </Layout>
-        </Router>
-      </TicketsProvider>
+      <Router>
+        <CommandPalette
+          tickets={tickets}
+          people={people}
+          sprints={sprints}
+          open={commandOpen}
+          onClose={() => setCommandOpen(false)}
+          onOpenTicket={handleOpenTicket}
+          onOpenPerson={handleOpenPerson}
+          onOpenSprint={handleOpenSprint}
+        />
+        {modal && modal.type === "ticket" && (
+          <Modal onClose={handleCloseModal} title={`Ticket #${modal.data.id}`}>
+            <TicketDetailPage tickets={tickets} loading={loading} id={modal.data.id} />
+          </Modal>
+        )}
+        {modal && modal.type === "person" && (
+          <Modal onClose={handleCloseModal} title={`Person: ${modal.data}`}>
+            <PeoplePage tickets={tickets.filter(t => t.owner === modal.data)} loading={loading} />
+          </Modal>
+        )}
+        {modal && modal.type === "sprint" && (
+          <Modal onClose={handleCloseModal} title={`Sprint: ${modal.data}`}>
+            <SprintsPage tickets={tickets.filter(t => (t.sprintName || t.sprint) === modal.data)} loading={loading} />
+          </Modal>
+        )}
+        <Layout>
+          <AppRoutes />
+        </Layout>
+      </Router>
     </>
   );
 }
