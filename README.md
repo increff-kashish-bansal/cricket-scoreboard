@@ -1,21 +1,28 @@
 # Cricket Scoreboard - React + Vite
 
+## How to Deploy (Azure Static Web Apps)
+
+1. **Build the app:**
+   ```sh
+   npm run build
+   ```
+2. **Deploy to Azure Static Web Apps:**
+   ```sh
+   swa deploy dist --deployment-token <your-deployment-token>
+   ```
+   Replace `<your-deployment-token>` with the value from Azure portal or CLI:
+   ```sh
+   az staticwebapp secrets list --name cricket-scoreboard --resource-group rg-ms-enterprise-qc-02
+   ```
+
+3. **If you update staticwebapp.config.json or public/tickets.csv, repeat the above steps.**
+
+---
+
 ## Production Deployment
 
 This app is deployed to Azure Static Web Apps:
 [https://ashy-mud-0cc393c0f-preview.eastus2.2.azurestaticapps.net](https://ashy-mud-0cc393c0f-preview.eastus2.2.azurestaticapps.net)
-
-### How to Deploy
-
-1. Build the app:
-   ```sh
-   npm run build
-   ```
-2. Deploy to Azure Static Web Apps:
-   ```sh
-   swa deploy dist --deployment-token <your-deployment-token>
-   ```
-   (Replace `<your-deployment-token>` with the value from Azure portal or CLI)
 
 ### Client-side Routing
 

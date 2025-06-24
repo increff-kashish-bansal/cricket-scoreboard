@@ -111,14 +111,14 @@ function SidebarNav() {
   return (
     <nav className="flex gap-2 mb-4">
       {navLinks.map(link => (
-        <a
+        <NavLink
           key={link.path}
-          href={link.path}
+          to={link.path}
           className={`px-3 py-2 rounded font-semibold transition-colors duration-200 ${location.pathname === link.path ? 'bg-blue-600 text-white shadow' : 'text-gray-700 hover:bg-blue-100'}`}
           aria-current={location.pathname === link.path ? 'page' : undefined}
         >
           {link.name}
-        </a>
+        </NavLink>
       ))}
     </nav>
   );
@@ -192,7 +192,11 @@ function App() {
     <>
       <Toaster position="top-right" />
       <TicketsProvider>
-        <Dashboard />
+        <Router>
+          <Layout>
+            <AppRoutes />
+          </Layout>
+        </Router>
       </TicketsProvider>
     </>
   );
