@@ -17,6 +17,7 @@ import React, { useEffect, useState } from "react";
 import { ArrowPathIcon } from "@heroicons/react/24/solid";
 import { Toaster } from 'react-hot-toast';
 import { MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import Modal from './Modal.jsx';
 
 const navLinks = [
   { name: "Dashboard", path: "/" },
@@ -174,16 +175,15 @@ function Placeholder({ title }) {
   );
 }
 
-function AppRoutes() {
+function AppRoutes({ handleShowTicketDetail, handleShowUserDetail }) {
   const { tickets, loading } = useTicketsContext();
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/tickets" element={<TicketsPage tickets={tickets} loading={loading} />} />
-      <Route path="/tickets/:id" element={<TicketDetailPage tickets={tickets} loading={loading} />} />
+      <Route path="/" element={<Dashboard tickets={tickets} loading={loading} onShowTicketDetail={handleShowTicketDetail} onShowUserDetail={handleShowUserDetail} />} />
+      <Route path="/tickets" element={<TicketsPage tickets={tickets} loading={loading} onShowTicketDetail={handleShowTicketDetail} />} />
       <Route path="/blockers" element={<BlockersPage tickets={tickets} loading={loading} />} />
       <Route path="/sprints" element={<SprintsPage tickets={tickets} loading={loading} />} />
-      <Route path="/people" element={<PeoplePage tickets={tickets} loading={loading} />} />
+      <Route path="/people" element={<PeoplePage tickets={tickets} loading={loading} onShowUserDetail={handleShowUserDetail} />} />
     </Routes>
   );
 }
@@ -288,6 +288,7 @@ function AppWithContext() {
   const { tickets, loading } = useTicketsContext();
   const [commandOpen, setCommandOpen] = React.useState(false);
   const [modal, setModal] = React.useState(null); // { type, data }
+  const [detailView, setDetailView] = React.useState({ type: null, payload: null });
 
   // Gather people and sprints for search
   const people = React.useMemo(() => Array.from(new Set(tickets.map(t => t.owner).filter(Boolean))), [tickets]);
@@ -305,17 +306,15 @@ function AppWithContext() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  function handleOpenTicket(ticket) {
-    setModal({ type: "ticket", data: ticket });
+  // Handler functions
+  function handleShowTicketDetail(ticketId) {
+    setDetailView({ type: 'ticket', payload: ticketId });
   }
-  function handleOpenPerson(name) {
-    setModal({ type: "person", data: name });
+  function handleShowUserDetail(userName) {
+    setDetailView({ type: 'user', payload: userName });
   }
-  function handleOpenSprint(name) {
-    setModal({ type: "sprint", data: name });
-  }
-  function handleCloseModal() {
-    setModal(null);
+  function handleCloseDetailView() {
+    setDetailView({ type: null, payload: null });
   }
 
   return (
@@ -328,27 +327,23 @@ function AppWithContext() {
           sprints={sprints}
           open={commandOpen}
           onClose={() => setCommandOpen(false)}
-          onOpenTicket={handleOpenTicket}
-          onOpenPerson={handleOpenPerson}
-          onOpenSprint={handleOpenSprint}
+          onOpenTicket={handleShowTicketDetail}
+          onOpenPerson={handleShowUserDetail}
+          onOpenSprint={handleShowTicketDetail}
         />
-        {modal && modal.type === "ticket" && (
-          <Modal onClose={handleCloseModal} title={`Ticket #${modal.data.id}`}>
-            <TicketDetailPage tickets={tickets} loading={loading} id={modal.data.id} />
+        {/* Centralized Modal Controller */}
+        {detailView.type === 'ticket' && (
+          <Modal onClose={handleCloseDetailView} title={`Ticket #${detailView.payload}`}>
+            <TicketDetailPage tickets={tickets} loading={loading} id={detailView.payload} />
           </Modal>
         )}
-        {modal && modal.type === "person" && (
-          <Modal onClose={handleCloseModal} title={`Person: ${modal.data}`}>
-            <PeoplePage tickets={tickets.filter(t => t.owner === modal.data)} loading={loading} />
-          </Modal>
-        )}
-        {modal && modal.type === "sprint" && (
-          <Modal onClose={handleCloseModal} title={`Sprint: ${modal.data}`}>
-            <SprintsPage tickets={tickets.filter(t => (t.sprintName || t.sprint) === modal.data)} loading={loading} />
+        {detailView.type === 'user' && (
+          <Modal onClose={handleCloseDetailView} title={`User: ${detailView.payload}`}>
+            <PeoplePage tickets={tickets.filter(t => t.owner === detailView.payload)} loading={loading} />
           </Modal>
         )}
         <Layout>
-          <AppRoutes />
+          <AppRoutes handleShowTicketDetail={handleShowTicketDetail} handleShowUserDetail={handleShowUserDetail} />
         </Layout>
       </Router>
     </>

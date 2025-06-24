@@ -171,15 +171,16 @@ export function TicketsProvider({ children }) {
         }
       }
       // Attach granular time properties to ticket
-      ticket.timeInCreatedHours = Math.round(timeInStatus['Created']);
-      ticket.timeInTechReviewHours = Math.round(timeInStatus['Tech Review']);
-      ticket.timeInClarificationHours = Math.round(timeInStatus['Blocked for Clarification']);
-      ticket.timeInSprintBacklogHours = Math.round(timeInStatus['In Sprint Backlog']);
-      ticket.timeInDevelopmentHours = Math.round(timeInStatus['In Development']);
-      ticket.timeInTechQCHours = Math.round(timeInStatus['Tech QC']);
-      ticket.timeInBusinessQCHours = Math.round(timeInStatus['Business QC']);
-      ticket.timeDeprioritizedHours = Math.round(timeInStatus['Deprioritized']);
-      ticket.timeInReleasedHours = Math.round(timeInStatus['Released']);
+      // Use pre-calculated values from CSV if available, otherwise use calculated values
+      ticket.timeInCreatedHours = Math.round(ticket.timeInCreatedHours || timeInStatus['Created']);
+      ticket.timeInTechReviewHours = Math.round(ticket.timeInTechReviewHours || timeInStatus['Tech Review']);
+      ticket.timeInClarificationHours = Math.round(ticket.timeInBlockedforClarificationHours || timeInStatus['Blocked for Clarification']);
+      ticket.timeInSprintBacklogHours = Math.round(ticket.timeInInSprintBacklogHours || timeInStatus['In Sprint Backlog']);
+      ticket.timeInDevelopmentHours = Math.round(ticket.timeInInDevelopmentHours || timeInStatus['In Development']);
+      ticket.timeInTechQCHours = Math.round(ticket.timeInTechQCHours || timeInStatus['Tech QC']);
+      ticket.timeInBusinessQCHours = Math.round(ticket.timeInBusinessQCHours || timeInStatus['Business QC']);
+      ticket.timeDeprioritizedHours = Math.round(ticket.timeInDeprioritizedHours || timeInStatus['Deprioritized']);
+      ticket.timeInReleasedHours = Math.round(ticket.timeInReleasedHours || timeInStatus['Released']);
       // Remove old generic time calculations
       delete ticket.calculatedTotalTimeBlockedHours;
       delete ticket.calculatedTotalTimeInDevHours;

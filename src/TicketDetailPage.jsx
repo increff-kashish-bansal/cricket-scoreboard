@@ -144,8 +144,13 @@ function StateDurationSummary({ ticket }) {
   );
 }
 
-export default function TicketDetailPage({ tickets = [], loading }) {
-  const { id } = useParams();
+export default function TicketDetailPage({ tickets = [], loading, id: ticketIdProp }) {
+  // Use ticketIdProp if provided, else use useParams
+  let id = ticketIdProp;
+  if (!id) {
+    const params = useParams();
+    id = params.id;
+  }
   const navigate = useNavigate();
   const ticketIdx = tickets.findIndex((t) => t.id?.toString() === id);
   const ticket = tickets[ticketIdx] || {};

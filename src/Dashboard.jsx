@@ -61,7 +61,7 @@ function getLatestSprintName(tickets) {
   return sprints.sort().slice(-1)[0];
 }
 
-function Dashboard() {
+function Dashboard({ onShowTicketDetail, onShowUserDetail }) {
   const { tickets, loading } = useTicketsContext();
   const [velocityMode, setVelocityMode] = useState('tickets'); // 'tickets' or 'hours'
   const [blockedThresholdDays, setBlockedThresholdDays] = useState(3); // user-defined threshold
@@ -73,6 +73,10 @@ function Dashboard() {
   // Modal state
   const [modal, setModal] = useState(null); // { type: 'tickets'|'blockers'|'sprints'|'people' }
   const [layout, setLayout] = React.useState(getStoredLayout() || DEFAULT_LAYOUT);
+
+  // Default handlers if props are not provided
+  const showTicketDetail = onShowTicketDetail || (() => {});
+  const showUserDetail = onShowUserDetail || (() => {});
 
   // Auto-detect current sprint
   const currentSprintName = getLatestSprintName(tickets);
@@ -100,11 +104,13 @@ function Dashboard() {
   // Top 3 blockers (by count, across filtered tickets)
   const blockerStats = {};
   filteredTickets.forEach(t => {
-    if (t.isBlocked || t.calculatedTotalTimeBlockedHours > 0) {
+    // Calculate total blocked time using new granular properties
+    const totalBlockedTime = (t.timeInClarificationHours || 0) + (t.timeDeprioritizedHours || 0);
+    if (t.isBlocked || totalBlockedTime > 0) {
       const entity = t.blockedBy || "Unknown";
       if (!blockerStats[entity]) blockerStats[entity] = { count: 0, totalBlocked: 0 };
       blockerStats[entity].count += 1;
-      blockerStats[entity].totalBlocked += t.calculatedTotalTimeBlockedHours || 0;
+      blockerStats[entity].totalBlocked += totalBlockedTime;
     }
   });
   const topBlockers = Object.entries(blockerStats)
@@ -132,7 +138,14 @@ function Dashboard() {
     } else {
       const hours = filteredSprintTickets
         .filter(t => completedStatuses.includes(t.status))
-        .reduce((sum, t) => sum + (t.calculatedTotalTimeInDevHours || 0), 0);
+        .reduce((sum, t) => {
+          // Calculate total development time using new granular properties
+          const devTime = (t.timeInDevelopmentHours || 0) + 
+                         (t.timeInTechQCHours || 0) + 
+                         (t.timeInBusinessQCHours || 0) +
+                         (t.timeInSprintBacklogHours || 0);
+          return sum + devTime;
+        }, 0);
       return { sprint, value: hours };
     }
   });
@@ -148,7 +161,9 @@ function Dashboard() {
   const ticketsBlockedOverXDays = filteredTickets.filter(t => {
     const thresholdHours = blockedThresholdDays * 24;
     if (t.isBlocked && t.currentBlockDurationHours > thresholdHours) return true;
-    if (!t.isBlocked && t.calculatedTotalTimeBlockedHours > thresholdHours) return true;
+    // Calculate total blocked time using new granular properties
+    const totalBlockedTime = (t.timeInClarificationHours || 0) + (t.timeDeprioritizedHours || 0);
+    if (!t.isBlocked && totalBlockedTime > thresholdHours) return true;
     return false;
   }).length;
 
@@ -704,18 +719,33 @@ function Dashboard() {
                             className={`border-t border-neutral-200 hover:bg-neutral-100 ${idx % 2 === 1 ? 'even:bg-neutral-50' : ''}`}
                           >
                             <td className="px-4 py-2 font-mono">
-                              <a href={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline flex items-center gap-1" title="View Timeline" aria-label="View Timeline">
-                                {ticket.id}
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5V3m-8 8v6a2 2 0 002 2h4a2 2 0 002-2v-6" /></svg>
-                              </a>
+                              <button type="button" onClick={() => showTicketDetail(ticket.id)} className="text-indigo-600 hover:text-indigo-800 font-medium text-left p-0 bg-transparent">{ticket.id}</button>
                             </td>
                             <td className="px-4 py-2">{ticket.title}</td>
                             <td className="px-4 py-2">
                               <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusPillClass(ticket.status)}`}>{ticket.status}</span>
                             </td>
-                            <td className="px-4 py-2">{ticket.owner}</td>
-                            <td className="px-4 py-2">{typeof ticket.calculatedTotalTimeInDevHours === 'number' ? ticket.calculatedTotalTimeInDevHours + 'h' : '-'}</td>
-                            <td className="px-4 py-2">{typeof ticket.calculatedTotalTimeBlockedHours === 'number' ? ticket.calculatedTotalTimeBlockedHours + 'h' : '-'}</td>
+                            <td className="px-4 py-2">
+                              <button type="button" onClick={() => showUserDetail(ticket.owner)} className="text-indigo-600 hover:text-indigo-800 font-medium text-left p-0 bg-transparent">{ticket.owner}</button>
+                            </td>
+                            <td className="px-4 py-2">
+                              {(() => {
+                                // Calculate total development time using new granular properties
+                                const devTime = (ticket.timeInDevelopmentHours || 0) + 
+                                               (ticket.timeInTechQCHours || 0) + 
+                                               (ticket.timeInBusinessQCHours || 0) +
+                                               (ticket.timeInSprintBacklogHours || 0);
+                                return devTime > 0 ? devTime + 'h' : '-';
+                              })()}
+                            </td>
+                            <td className="px-4 py-2">
+                              {(() => {
+                                // Calculate total blocked time using new granular properties
+                                const blockedTime = (ticket.timeInClarificationHours || 0) + 
+                                                   (ticket.timeDeprioritizedHours || 0);
+                                return blockedTime > 0 ? blockedTime + 'h' : '-';
+                              })()}
+                            </td>
                             <td className="px-4 py-2">{ticket.sprintName || ticket.sprint || '-'}</td>
                           </tr>
                         ))

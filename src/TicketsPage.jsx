@@ -90,7 +90,7 @@ const statusPillClass = status => {
   }
 };
 
-export default function TicketsPage({ tickets = [], loading }) {
+export default function TicketsPage({ tickets = [], loading, onShowTicketDetail, onShowUserDetail }) {
   console.log('TicketsPage received:', { ticketsCount: tickets.length, loading, tickets: tickets.slice(0, 3) });
   
   const [statusFilter, setStatusFilter] = useState([]);
@@ -263,6 +263,10 @@ export default function TicketsPage({ tickets = [], loading }) {
     return tasks;
   }
 
+  // Fallbacks for handler props
+  const showTicketDetail = onShowTicketDetail || (() => {});
+  const showUserDetail = onShowUserDetail || (() => {});
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -375,10 +379,7 @@ export default function TicketsPage({ tickets = [], loading }) {
                       className={`border-t border-neutral-200 hover:bg-neutral-100 ${idx % 2 === 1 ? 'even:bg-neutral-50' : ''} ${highlight ? 'bg-red-100' : ''}`}
                     >
                       <td className="px-4 py-2 font-mono relative group">
-                        <Link to={`/tickets/${ticket.id}`} className="text-blue-600 hover:underline flex items-center gap-1" title="View Timeline" aria-label="View Timeline">
-                          {ticket.id}
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 17l4 4 4-4m0-5V3m-8 8v6a2 2 0 002 2h4a2 2 0 002-2v-6" /></svg>
-                        </Link>
+                        <button type="button" onClick={() => showTicketDetail(ticket.id)} className="text-indigo-600 hover:text-indigo-800 font-medium text-left p-0 bg-transparent">{ticket.id}</button>
                         {/* Eye icon for quick view */}
                         <button
                           type="button"
@@ -426,7 +427,9 @@ export default function TicketsPage({ tickets = [], loading }) {
                       <td className="px-4 py-2">
                         <span className={`inline-block px-2 py-0.5 rounded-full border text-xs font-semibold ${statusPillClass(ticket.status)}`}>{ticket.status}</span>
                       </td>
-                      <td className="px-4 py-2">{ticket.owner}</td>
+                      <td className="px-4 py-2">
+                        <button type="button" onClick={() => showUserDetail(ticket.owner)} className="text-indigo-600 hover:text-indigo-800 font-medium text-left p-0 bg-transparent">{ticket.owner}</button>
+                      </td>
                       <td className="px-4 py-2">{ticket.blocked === "TRUE" || ticket.blocked === true ? "Y" : "N"}</td>
                       <td className="px-4 py-2">{ticket.blockedBy || "-"}</td>
                       <td className="px-4 py-2">{typeof ticket.calculatedTotalTimeInDevHours === 'number' ? ticket.calculatedTotalTimeInDevHours + 'h' : '-'}</td>
