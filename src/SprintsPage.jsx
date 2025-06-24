@@ -93,6 +93,8 @@ export default function SprintsPage({ tickets = [], loading }) {
   const [sprintFilter, setSprintFilter] = useState("");
   const [sprintSearch, setSprintSearch] = useState("");
   const [ticketSort, setTicketSort] = useState({ key: null, direction: "asc" });
+  // Comparison state
+  const [compareSprints, setCompareSprints] = useState([]); // array of sprint names (max 2)
 
   // Memoize sprints and sprintNames
   const sprints = useMemo(() => groupBySprint(tickets), [tickets]);
@@ -103,6 +105,19 @@ export default function SprintsPage({ tickets = [], loading }) {
   if (sprintFilter) {
     sprintNames = sprintNames.filter(s => s === sprintFilter);
   }
+
+  // --- Comparison Table Data ---
+  const comparisonStats = compareSprints.map(sprint => {
+    const stats = getSprintStats(sprints[sprint] || []);
+    return {
+      name: sprint,
+      total: stats.total,
+      percentBlocked: stats.percentBlocked,
+      avgDev: stats.avgDevExBlocked,
+      totalBlocked: stats.totalBlocked,
+      efficiency: stats.efficiency,
+    };
+  });
 
   // --- Stacked Bar Chart Data ---
   const sprintChartData = sprintNames.map(sprint => {
@@ -164,9 +179,62 @@ export default function SprintsPage({ tickets = [], loading }) {
     );
   }
 
+  // Checkbox handler
+  function handleCompareCheckbox(sprint) {
+    setCompareSprints(prev => {
+      if (prev.includes(sprint)) return prev.filter(s => s !== sprint);
+      if (prev.length < 2) return [...prev, sprint];
+      return prev;
+    });
+  }
+
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Sprints</h1>
+      {/* Comparison Section */}
+      {compareSprints.length === 2 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg shadow-sm p-6 mb-8">
+          <h2 className="text-lg font-semibold text-blue-800 mb-4">Sprint Comparison</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-[400px] text-sm">
+              <thead>
+                <tr className="bg-blue-100 text-blue-900">
+                  <th className="px-4 py-2 text-left">Metric</th>
+                  <th className="px-4 py-2 text-center">{comparisonStats[0].name}</th>
+                  <th className="px-4 py-2 text-center">{comparisonStats[1].name}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="px-4 py-2 font-semibold">Total Tickets</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[0].total}</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[1].total}</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2 font-semibold">% Blocked</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[0].percentBlocked}%</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[1].percentBlocked}%</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2 font-semibold">Avg Dev Time (h)</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[0].avgDev}</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[1].avgDev}</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2 font-semibold">Total Blocked Hours</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[0].totalBlocked}</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[1].totalBlocked}</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2 font-semibold">Efficiency Score</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[0].efficiency}%</td>
+                  <td className="px-4 py-2 text-center">{comparisonStats[1].efficiency}%</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       {/* Sprint Filter & Search */}
       <div className="bg-neutral-100 rounded-lg shadow-sm p-4 mb-6">
         <div className="flex flex-wrap gap-4 items-end">
@@ -306,10 +374,19 @@ export default function SprintsPage({ tickets = [], loading }) {
                 <div key={sprint} className="bg-white rounded shadow p-4">
                   <div className="flex justify-between items-center cursor-pointer" onClick={() => setExpandedSprint(expandedSprint === sprint ? null : sprint)}>
                     <div className="flex items-center gap-2">
+                      {/* Comparison Checkbox */}
+                      <input
+                        type="checkbox"
+                        className="form-checkbox h-5 w-5 text-blue-600 mr-2"
+                        checked={compareSprints.includes(sprint)}
+                        onChange={e => { e.stopPropagation(); handleCompareCheckbox(sprint); }}
+                        disabled={!compareSprints.includes(sprint) && compareSprints.length >= 2}
+                        aria-label={`Compare ${sprint}`}
+                      />
                       <h2 className="text-lg font-semibold">{sprint}</h2>
                       {getEfficiencyBadge(stats.efficiency)}
                     </div>
-                    <button className="bg-transparent text-primary border border-primary px-3 py-1 rounded-md hover:bg-primary-light hover:text-white transition-all" onClick={() => setExpandedSprint(expandedSprint === sprint ? null : sprint)}>{expandedSprint === sprint ? "Hide" : "Show"} Details</button>
+                    <button className="bg-transparent text-primary border border-primary px-3 py-1 rounded-md hover:bg-primary-light hover:text-white transition-all" onClick={e => { e.stopPropagation(); setExpandedSprint(expandedSprint === sprint ? null : sprint); }}>{expandedSprint === sprint ? "Hide" : "Show"} Details</button>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                     <div><span className="font-semibold">Tickets Blocked:</span> {stats.blockedCount}</div>

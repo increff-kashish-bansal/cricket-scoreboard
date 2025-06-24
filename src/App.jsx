@@ -192,15 +192,7 @@ function App() {
     <>
       <Toaster position="top-right" />
       <TicketsProvider>
-        <Router>
-          <TopBar />
-          <div className="max-w-7xl mx-auto px-4">
-            <SidebarNav />
-            <div className="min-h-[60vh] bg-white rounded shadow p-6 mb-8 animate-fadein">
-              <AppRoutes />
-            </div>
-          </div>
-        </Router>
+        <Dashboard />
       </TicketsProvider>
     </>
   );

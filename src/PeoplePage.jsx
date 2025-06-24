@@ -204,6 +204,21 @@ export default function PeoplePage({ tickets = [], loading }) {
   }
   const allSprintsChrono = getChronologicalSprints();
 
+  // --- Workload Stacked Bar Chart Data (Developers tab) ---
+  let workloadData = [];
+  if (tab === "developers") {
+    // For each developer, count tickets by status
+    const statusKeys = ["In Progress", "Blocked", "In Review"];
+    workloadData = Object.values(devStats).map(dev => {
+      const ownedTickets = ticketsToUse.filter(t => t.owner === dev.name);
+      const statusCounts = { name: dev.name };
+      statusKeys.forEach(status => {
+        statusCounts[status] = ownedTickets.filter(t => t.status === status).length;
+      });
+      return statusCounts;
+    });
+  }
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -292,6 +307,36 @@ export default function PeoplePage({ tickets = [], loading }) {
             </button>
           ))}
         </div>
+        {/* WORKLOAD STACKED BAR CHART (Developers tab only) */}
+        {tab === "developers" && (
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-neutral-700 mb-2">Current Workload by Developer</h2>
+            <div className="w-full h-80">
+              <ResponsiveContainer>
+                <BarChart
+                  data={workloadData}
+                  layout="vertical"
+                  margin={{ left: 120, right: 24, top: 24, bottom: 24 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis type="number" allowDecimals={false} tick={{ fontSize: 14, fill: '#374151' }} label={{ value: 'Number of Tickets', position: 'insideBottomRight', offset: -5, fill: '#374151', fontSize: 14 }} />
+                  <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 14, fill: '#374151' }} />
+                  <Tooltip
+                    contentStyle={{ background: '#f5f5f5', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
+                    wrapperClassName="!z-50"
+                    labelClassName="text-neutral-700"
+                    itemStyle={{ color: '#374151' }}
+                  />
+                  <Legend wrapperStyle={{ color: '#52525b', fontSize: 14, paddingBottom: 8 }} iconType="circle" align="right" verticalAlign="top" layout="horizontal" />
+                  <Bar dataKey="In Progress" stackId="a" fill="#fbbf24" name="In Progress" radius={[4, 4, 4, 4]} />
+                  <Bar dataKey="Blocked" stackId="a" fill="#f87171" name="Blocked" radius={[4, 4, 4, 4]} />
+                  <Bar dataKey="In Review" stackId="a" fill="#2563eb" name="In Review" radius={[4, 4, 4, 4]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-xs text-gray-500 mt-2">Shows the number of tickets each developer currently owns, segmented by status. Helps spot overload and available capacity.</div>
+          </div>
+        )}
         {/* PEOPLE CARDS */}
         {loadingToUse ? (
           <div className="flex flex-col items-center justify-center py-8 text-neutral-500">

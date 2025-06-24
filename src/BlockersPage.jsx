@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Papa from "papaparse";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from "recharts";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from "recharts";
 import { saveAs } from "file-saver";
 import { Link } from "react-router-dom";
 import { ArrowPathIcon, InformationCircleIcon } from "@heroicons/react/24/solid";
@@ -191,12 +191,66 @@ export default function BlockersPage({ tickets = [], loading }) {
   // --- SPRINTS ---
   const allSprints = Array.from(new Set(ticketsToUse.map(t => t.sprint || "No Sprint")));
 
+  // --- Blocked Hours Trend Data (Line Chart) ---
+  // Group by sprint (chronological order)
+  const sprintBlockedHours = {};
+  ticketsToUse.forEach(ticket => {
+    const sprint = ticket.sprintName || ticket.sprint || "No Sprint";
+    const blockedH = ticket.calculatedTotalTimeBlockedHours || 0;
+    if (!sprintBlockedHours[sprint]) sprintBlockedHours[sprint] = 0;
+    sprintBlockedHours[sprint] += blockedH;
+  });
+  // Prepare data for last 8 sprints (or all)
+  const sprintNamesChrono = Object.keys(sprintBlockedHours).sort();
+  const lastSprints = sprintNamesChrono.slice(-8);
+  const lineChartData = lastSprints.map(sprint => ({
+    sprint,
+    totalBlocked: sprintBlockedHours[sprint] || 0,
+  }));
+
   // --- SUMMARY METRICS ---
   const totalTicketsBlocked = Object.values(blockerStats).reduce((acc, b) => acc + b.ticketIds.size, 0);
 
   return (
     <div>
       <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Blocker Dashboard</h1>
+      {/* Blocked Hours Trend Line Chart */}
+      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-8">
+        <h2 className="text-lg font-semibold text-neutral-700 mb-2">Blocked Hours Trend (Last 8 Sprints)</h2>
+        <div className="w-full h-64">
+          <ResponsiveContainer>
+            <LineChart data={lineChartData} margin={{ top: 24, right: 32, left: 32, bottom: 24 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+              <XAxis dataKey="sprint" tick={{ fontSize: 14, fill: '#374151' }} />
+              <YAxis tick={{ fontSize: 14, fill: '#374151' }} label={{ value: 'Total Hours Blocked', angle: -90, position: 'insideLeft', fill: '#374151', fontSize: 14 }} allowDecimals={false} />
+              <Tooltip
+                contentStyle={{ background: '#f5f5f5', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
+                wrapperClassName="!z-50"
+                labelClassName="text-neutral-700"
+                itemStyle={{ color: '#374151' }}
+                formatter={(value) => `${value}h`}
+              />
+              <Legend
+                wrapperStyle={{ color: '#52525b', fontSize: 14, paddingBottom: 8 }}
+                iconType="circle"
+                align="right"
+                verticalAlign="top"
+                layout="horizontal"
+              />
+              <Line
+                type="monotone"
+                dataKey="totalBlocked"
+                stroke="#ef4444"
+                strokeWidth={3}
+                dot={{ r: 5, stroke: '#ef4444', strokeWidth: 2, fill: '#fff' }}
+                activeDot={{ r: 8, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }}
+                name="Total Hours Blocked"
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="text-xs text-gray-500 mt-2">Shows whether the overall blocker situation is improving or worsening over time.</div>
+      </div>
       {loadingToUse ? (
         <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
           <ArrowPathIcon className="h-10 w-10 animate-spin mb-2" />

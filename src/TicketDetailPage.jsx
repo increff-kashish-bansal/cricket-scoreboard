@@ -67,7 +67,9 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       'default': '#bdbdbd',
     };
     const blockedBarFill = '#991B1B';
+    const criticalBlockerFill = '#ff1744'; // Brighter red
     const tasks = [];
+    const blockedTasks = [];
     for (let i = 0; i < eventLogParsed.length; i++) {
       const ev = eventLogParsed[i];
       if (!ev.status || !ev.timestamp) continue;
@@ -90,6 +92,12 @@ export default function TicketDetailPage({ tickets = [], loading }) {
       // Concise name for bar
       let name = phaseStatus;
       
+      // Calculate duration (ms) for blocked phases
+      let durationMs = null;
+      if (phaseStatus === 'Blocked') {
+        durationMs = new Date(ganttEnd) - new Date(start);
+      }
+      
       // Use the library's built-in color properties
       const task = {
         id: `${ticketDetails.id}-${i}-${phaseStatus}`,
@@ -106,9 +114,26 @@ export default function TicketDetailPage({ tickets = [], loading }) {
         blockedBy: ev.blockedBy,
         user: ev.user,
         reason: ev.reason || ev.note,
+        // For critical detection
+        durationMs,
       };
       
+      if (phaseStatus === 'Blocked') blockedTasks.push({ idx: tasks.length, durationMs: durationMs || 0 });
       tasks.push(task);
+    }
+    // Find the blocked task with the max duration
+    if (blockedTasks.length > 0) {
+      const maxIdx = blockedTasks.reduce((maxI, t, i, arr) => t.durationMs > arr[maxI].durationMs ? i : maxI, 0);
+      const criticalIdx = blockedTasks[maxIdx].idx;
+      if (tasks[criticalIdx]) {
+        tasks[criticalIdx].isCriticalBlocker = true;
+        // Brighter red and glowing effect
+        tasks[criticalIdx].backgroundColor = criticalBlockerFill;
+        tasks[criticalIdx].barColor = criticalBlockerFill;
+        tasks[criticalIdx].barProgressColor = criticalBlockerFill;
+        tasks[criticalIdx].progressColor = criticalBlockerFill;
+        tasks[criticalIdx].customClass = 'gantt-critical-blocker';
+      }
     }
     return tasks;
   }
@@ -335,13 +360,63 @@ export default function TicketDetailPage({ tickets = [], loading }) {
     // For now, just log or ignore (could update state if you want editable Gantt)
     // console.log('Date changed:', task, newStart, newEnd);
   }
+
+  // --- Highlight/scroll refs for logs ---
+  const blockerLogRefs = useRef([]);
+  const statusLogRefs = useRef([]);
+  const [highlightedBlockerIdx, setHighlightedBlockerIdx] = useState(null);
+  const [highlightedStatusIdx, setHighlightedStatusIdx] = useState(null);
+
+  // Scroll and highlight logic
+  useEffect(() => {
+    if (highlightedBlockerIdx != null && blockerLogRefs.current[highlightedBlockerIdx]) {
+      blockerLogRefs.current[highlightedBlockerIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const timeout = setTimeout(() => setHighlightedBlockerIdx(null), 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [highlightedBlockerIdx]);
+  useEffect(() => {
+    if (highlightedStatusIdx != null && statusLogRefs.current[highlightedStatusIdx]) {
+      statusLogRefs.current[highlightedStatusIdx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+      const timeout = setTimeout(() => setHighlightedStatusIdx(null), 2000);
+      return () => clearTimeout(timeout);
+    }
+  }, [highlightedStatusIdx]);
+
+  // Enhanced onTaskClick handler
   function handleTaskClick(task) {
     setSelectedTaskId(task.id);
     setTaskDetail(task);
-    // Optionally scroll to or highlight corresponding log entry
-  }
-  function handleExpanderClick(task) {
-    // Not used for flat tasks, but could be implemented for groups
+    // Interactive linking: scroll to and highlight log entry
+    if (task.name === 'Blocked') {
+      // Find matching Blocker Log entry by start/end
+      const idx = blockerLog.findIndex(block => {
+        const blockStart = block.since && new Date(block.since).getTime();
+        const blockEnd = block.resumedAt && new Date(block.resumedAt).getTime();
+        const taskStart = task.start && new Date(task.start).getTime();
+        const taskEnd = task.end && new Date(task.end).getTime();
+        // Allow some leeway in ms
+        const leeway = 60000; // 1 min
+        return (
+          (blockStart && taskStart && Math.abs(blockStart - taskStart) < leeway) &&
+          ((blockEnd && taskEnd && Math.abs(blockEnd - taskEnd) < leeway) || (!blockEnd && !taskEnd))
+        );
+      });
+      if (idx !== -1) setHighlightedBlockerIdx(idx);
+    } else {
+      // Find matching Status Change Log entry by status and timestamp
+      const idx = statusLog.findIndex(log => {
+        const taskStart = task.start && new Date(task.start).getTime();
+        const logTime = log.timestamp && new Date(log.timestamp).getTime();
+        const leeway = 60000; // 1 min
+        // Try to match by time and status
+        return (
+          logTime && taskStart && Math.abs(logTime - taskStart) < leeway &&
+          (log.to === task.name || log.from === task.name)
+        );
+      });
+      if (idx !== -1) setHighlightedStatusIdx(idx);
+    }
   }
 
   return (
@@ -450,6 +525,16 @@ export default function TicketDetailPage({ tickets = [], loading }) {
           ))}
         </div>
         <div style={{ background: '#fff', borderRadius: 8, padding: 8, minWidth: 600, overflowX: 'auto' }}>
+          <style>{`
+            .gantt-critical-blocker-bar {
+              filter: drop-shadow(0 0 8px #ff1744) drop-shadow(0 0 16px #ff1744);
+              animation: glowCriticalBlocker 1.2s infinite alternate;
+            }
+            @keyframes glowCriticalBlocker {
+              0% { filter: drop-shadow(0 0 8px #ff1744); }
+              100% { filter: drop-shadow(0 0 20px #ff1744); }
+            }
+          `}</style>
           <Gantt
             tasks={ganttTasks}
             viewMode={viewMode}
@@ -461,7 +546,7 @@ export default function TicketDetailPage({ tickets = [], loading }) {
             barCornerRadius={6}
             onDateChange={handleDateChange}
             onTaskClick={handleTaskClick}
-            onExpanderClick={handleExpanderClick}
+            onExpanderClick={handleTaskClick}
             TooltipContent={({ task }) => {
               const durationH = task.start && task.end ? Math.round((new Date(task.end) - new Date(task.start)) / 36e5) : null;
               return (
@@ -477,9 +562,16 @@ export default function TicketDetailPage({ tickets = [], loading }) {
                       {task.reason && <div className="mt-1 text-xs text-neutral-700 bg-yellow-50 rounded p-2">Reason: {task.reason}</div>}
                     </>
                   )}
+                  {task.isCriticalBlocker && (
+                    <div className="mt-2 p-2 rounded bg-red-100 border border-red-300 text-red-900 font-bold text-sm flex items-center gap-2">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff1744" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Longest Blocker Phase
+                    </div>
+                  )}
                 </div>
               );
             }}
+            barClassName={task => task.isCriticalBlocker ? 'gantt-critical-blocker-bar' : ''}
           />
         </div>
         {/* Show details for selected phase */}
@@ -501,7 +593,11 @@ export default function TicketDetailPage({ tickets = [], loading }) {
             <div className="py-4 text-neutral-500">No blocks recorded.</div>
           ) : (
             blockerLog.map((block, idx) => (
-              <div key={idx} className="py-4 flex flex-col md:flex-row md:items-center md:gap-6 gap-y-2 gap-x-6">
+              <div
+                key={idx}
+                ref={el => blockerLogRefs.current[idx] = el}
+                className={`py-4 flex flex-col md:flex-row md:items-center md:gap-6 gap-y-2 gap-x-6 transition-all duration-500 ${highlightedBlockerIdx === idx ? 'ring-4 ring-primary/40 bg-primary/10' : ''}`}
+              >
                 <span className="font-semibold text-status-blocked text-lg">{block.blockedBy}</span>
                 <span className="text-xs text-neutral-500">{block.since ? formatDateForDisplay(block.since) : ''} → {block.resumedAt ? formatDateForDisplay(block.resumedAt) : 'now'}</span>
                 <span className="text-sm text-neutral-700 font-mono bg-yellow-100 rounded px-2 py-1">Duration: {block.duration}</span>
@@ -536,7 +632,11 @@ export default function TicketDetailPage({ tickets = [], loading }) {
                 <tr><td colSpan={4} className="py-4 text-neutral-500">No status changes recorded.</td></tr>
               ) : (
                 statusLog.map((log, idx) => (
-                  <tr key={idx} className="divide-y divide-neutral-200">
+                  <tr
+                    key={idx}
+                    ref={el => statusLogRefs.current[idx] = el}
+                    className={`divide-y divide-neutral-200 transition-all duration-500 ${highlightedStatusIdx === idx ? 'ring-4 ring-primary/40 bg-primary/10' : ''}`}
+                  >
                     <td className="px-4 py-3 whitespace-nowrap text-xs text-neutral-500">{log.timestamp ? formatDateForDisplay(log.timestamp) : ''}</td>
                     <td className="px-4 py-3 text-sm text-neutral-700">{log.from}</td>
                     <td className="px-4 py-3 text-sm text-neutral-700">{log.to}</td>
