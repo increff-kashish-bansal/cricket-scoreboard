@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, Cell
 import { saveAs } from "file-saver";
 import { ArrowPathIcon, InformationCircleIcon } from "@heroicons/react/24/solid";
 import { formatHoursToDuration } from "./utils.js";
+import { Link } from "react-router-dom";
 
 function parseTime(str) {
   if (!str || str === "-") return 0;
@@ -54,7 +55,7 @@ export default function PeoplePage({ tickets = [], loading }) {
   useEffect(() => {
     if (tickets.length) return;
     setLoading(true);
-    Papa.parse("/tickets.csv", {
+    Papa.parse("/ticket.csv", {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -423,8 +424,10 @@ export default function PeoplePage({ tickets = [], loading }) {
                   </thead>
                   <tbody>
                     {getPersonTickets(modalPerson).map(t => (
-                      <tr key={t.id} className="border-t border-neutral-200 hover:bg-neutral-50">
-                        <td className="px-2 py-1 font-mono">{t.id}</td>
+                      <tr key={t.id} className="border-t border-neutral-200 hover:bg-neutral-50 cursor-pointer">
+                        <td className="px-2 py-1 font-mono">
+                          <Link to={`/tickets/${t.id}`} className="text-blue-600 hover:underline">{t.id}</Link>
+                        </td>
                         <td className="px-2 py-1">{t.status}</td>
                         <td className="px-2 py-1">{t.calculatedTotalTimeInDevHours != null ? formatHoursToDuration(t.calculatedTotalTimeInDevHours) : '-'}</td>
                         <td className="px-2 py-1">{t.calculatedTotalTimeBlockedHours != null ? formatHoursToDuration(t.calculatedTotalTimeBlockedHours) : '-'}</td>

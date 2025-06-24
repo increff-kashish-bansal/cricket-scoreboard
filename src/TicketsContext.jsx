@@ -131,8 +131,23 @@ export function TicketsProvider({ children }) {
       }
       ticket.eventLogParsed = eventLogParsed;
 
-      // --- 2.3 Calculate Comprehensive Ticket Durations ---
-      let totalTimeBlockedH = 0, totalTimeInDevH = 0, totalTimeInReviewH = 0, totalTimeInQAH = 0;
+      // --- 2.3 Calculate Comprehensive Ticket Durations (Revamped for granular lifecycle) ---
+      const lifecycleStatuses = [
+        'Created',
+        'Tech Review',
+        'Blocked for Clarification',
+        'In Sprint Backlog',
+        'In Development',
+        'Tech QC',
+        'Business QC',
+        'Deprioritized',
+        'Released'
+      ];
+      // Initialize time trackers
+      const timeInStatus = {};
+      lifecycleStatuses.forEach(status => {
+        timeInStatus[status] = 0;
+      });
       let lastStatus = null, lastTimestamp = null;
       const now = new Date();
       for (let i = 0; i < eventLogParsed.length; i++) {
@@ -140,10 +155,9 @@ export function TicketsProvider({ children }) {
         if (lastStatus && lastTimestamp) {
           if (ev.timestamp > lastTimestamp) {
             const calcH = calculateWorkingHours(lastTimestamp, ev.timestamp);
-            if (lastStatus === 'Blocked') totalTimeBlockedH += calcH;
-            if (lastStatus === 'In Progress') totalTimeInDevH += calcH;
-            if (lastStatus === 'In Review') totalTimeInReviewH += calcH;
-            if (lastStatus === 'QA') totalTimeInQAH += calcH;
+            if (lifecycleStatuses.includes(lastStatus)) {
+              timeInStatus[lastStatus] += calcH;
+            }
           }
         }
         lastStatus = ev.status;
@@ -152,15 +166,25 @@ export function TicketsProvider({ children }) {
       // If not done, add time from last event to now
       if (lastStatus && lastTimestamp && ticket.status !== 'Done' && ticket.status !== 'Deployed') {
         const calcH = calculateWorkingHours(lastTimestamp, now);
-        if (lastStatus === 'Blocked') totalTimeBlockedH += calcH;
-        if (lastStatus === 'In Progress') totalTimeInDevH += calcH;
-        if (lastStatus === 'In Review') totalTimeInReviewH += calcH;
-        if (lastStatus === 'QA') totalTimeInQAH += calcH;
+        if (lifecycleStatuses.includes(lastStatus)) {
+          timeInStatus[lastStatus] += calcH;
+        }
       }
-      ticket.calculatedTotalTimeBlockedHours = Math.round(totalTimeBlockedH);
-      ticket.calculatedTotalTimeInDevHours = Math.round(totalTimeInDevH);
-      ticket.calculatedTotalTimeInReviewHours = Math.round(totalTimeInReviewH);
-      ticket.calculatedTotalTimeInQAHours = Math.round(totalTimeInQAH);
+      // Attach granular time properties to ticket
+      ticket.timeInCreatedHours = Math.round(timeInStatus['Created']);
+      ticket.timeInTechReviewHours = Math.round(timeInStatus['Tech Review']);
+      ticket.timeInClarificationHours = Math.round(timeInStatus['Blocked for Clarification']);
+      ticket.timeInSprintBacklogHours = Math.round(timeInStatus['In Sprint Backlog']);
+      ticket.timeInDevelopmentHours = Math.round(timeInStatus['In Development']);
+      ticket.timeInTechQCHours = Math.round(timeInStatus['Tech QC']);
+      ticket.timeInBusinessQCHours = Math.round(timeInStatus['Business QC']);
+      ticket.timeDeprioritizedHours = Math.round(timeInStatus['Deprioritized']);
+      ticket.timeInReleasedHours = Math.round(timeInStatus['Released']);
+      // Remove old generic time calculations
+      delete ticket.calculatedTotalTimeBlockedHours;
+      delete ticket.calculatedTotalTimeInDevHours;
+      delete ticket.calculatedTotalTimeInReviewHours;
+      delete ticket.calculatedTotalTimeInQAHours;
       // Total cycle time
       if (ticket.Created_On_Date && ticket.Resolved_At_Date) {
         ticket.totalCycleTimeHours = Math.round(calculateWorkingHours(ticket.Created_On_Date, ticket.Resolved_At_Date));
@@ -190,7 +214,7 @@ export function TicketsProvider({ children }) {
 
   const loadTickets = useCallback(() => {
     setLoading(true);
-    Papa.parse("/tickets.csv", {
+    Papa.parse("/ticket.csv", {
       download: true,
       header: true,
       skipEmptyLines: true,

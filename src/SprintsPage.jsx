@@ -166,7 +166,7 @@ export default function SprintsPage({ tickets = [], loading }) {
   function handleExport(sprintTickets) {
     const csv = toCSV(sprintTickets);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(blob, "sprint-tickets.csv");
+    saveAs(blob, "sprint-ticket.csv");
   }
 
   // Sprint Efficiency Score

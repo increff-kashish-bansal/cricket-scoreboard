@@ -15,7 +15,7 @@
    az staticwebapp secrets list --name cricket-scoreboard --resource-group rg-ms-enterprise-qc-02
    ```
 
-3. **If you update staticwebapp.config.json or public/tickets.csv, repeat the above steps.**
+3. **If you update staticwebapp.config.json or public/ticket.csv, repeat the above steps.**
 
 ---
 

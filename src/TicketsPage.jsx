@@ -7,6 +7,30 @@ import 'gantt-task-react/dist/index.css';
 
 const statuses = ["To Do", "In Progress", "Blocked", "Done"];
 
+// Granular lifecycle statuses for filter and indicator
+const lifecycleStatuses = [
+  'Created',
+  'Tech Review',
+  'Blocked for Clarification',
+  'In Sprint Backlog',
+  'In Development',
+  'Tech QC',
+  'Business QC',
+  'Deprioritized',
+  'Released'
+];
+const statusColors = {
+  'Created': 'bg-gray-400',
+  'Tech Review': 'bg-blue-400',
+  'Blocked for Clarification': 'bg-yellow-400',
+  'In Sprint Backlog': 'bg-purple-400',
+  'In Development': 'bg-blue-600',
+  'Tech QC': 'bg-green-400',
+  'Business QC': 'bg-green-600',
+  'Deprioritized': 'bg-orange-400',
+  'Released': 'bg-green-800',
+};
+
 function parseTimeBlocked(str) {
   if (!str || str === "-") return 0;
   let days = 0, hours = 0;
@@ -69,7 +93,7 @@ const statusPillClass = status => {
 export default function TicketsPage({ tickets = [], loading }) {
   console.log('TicketsPage received:', { ticketsCount: tickets.length, loading, tickets: tickets.slice(0, 3) });
   
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState([]);
   const [ownerFilter, setOwnerFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
@@ -83,7 +107,7 @@ export default function TicketsPage({ tickets = [], loading }) {
   // Filtering and sorting with memoization
   const filteredTickets = useMemo(() => {
     let result = tickets.filter(ticket => {
-      const matchesStatus = statusFilter === "" || ticket.status === statusFilter;
+      const matchesStatus = statusFilter.length === 0 || (ticket.eventLogParsed && statusFilter.some(sf => ticket.eventLogParsed.some(ev => ev.status === sf)));
       const matchesOwner = ownerFilter === "" || ticket.owner === ownerFilter;
       const matchesSearch =
         searchTerm.trim() === "" ||
@@ -140,7 +164,7 @@ export default function TicketsPage({ tickets = [], loading }) {
     });
     const csv = toCSV(ticketsWithEventLog);
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    saveAs(blob, "tickets.csv");
+    saveAs(blob, "ticket.csv");
   }
 
   function handleSort(key) {
@@ -163,6 +187,7 @@ export default function TicketsPage({ tickets = [], loading }) {
     { key: "blockedBy", label: "Blocked By" },
     { key: "calculatedTotalTimeInDevHours", label: "Time in Dev" },
     { key: "calculatedTotalTimeBlockedHours", label: "Time Blocked" },
+    { key: "lifecycle", label: "Lifecycle" },
   ];
 
   // Helper: transform event log to Gantt tasks (from TicketDetailPage)
@@ -247,16 +272,24 @@ export default function TicketsPage({ tickets = [], loading }) {
       <div className="flex flex-wrap gap-4 mb-4 items-end">
         <div>
           <label className="block text-sm font-medium text-neutral-600 mb-1">Status</label>
-          <select
-            className="border border-neutral-300 rounded-md px-3 py-2 w-full text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-          >
-            <option value="">All</option>
-            {statuses.map(status => (
-              <option key={status} value={status}>{status}</option>
+          <div className="flex flex-col gap-1 bg-white border border-neutral-300 rounded-md px-3 py-2">
+            {lifecycleStatuses.map(status => (
+              <label key={status} className="inline-flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  value={status}
+                  checked={statusFilter.includes(status)}
+                  onChange={e => {
+                    if (e.target.checked) setStatusFilter(prev => [...prev, status]);
+                    else setStatusFilter(prev => prev.filter(s => s !== status));
+                  }}
+                  className="accent-primary"
+                />
+                <span className={`w-3 h-3 rounded-full inline-block ${statusColors[status] || 'bg-gray-200'}`}></span>
+                {status}
+              </label>
             ))}
-          </select>
+          </div>
         </div>
         <div>
           <label className="block text-sm font-medium text-neutral-600 mb-1">Owner</label>
@@ -400,6 +433,17 @@ export default function TicketsPage({ tickets = [], loading }) {
                       <td className="px-4 py-2 flex items-center gap-2">
                         {typeof ticket.calculatedTotalTimeBlockedHours === 'number' ? ticket.calculatedTotalTimeBlockedHours + 'h' : '-'}
                         {highlight && <span title="Currently blocked > 3 days" className="text-red-600">⚠️</span>}
+                      </td>
+                      <td className="px-4 py-2">
+                        <div className="flex gap-1 items-center">
+                          {(ticket.eventLogParsed || []).map((ev, i, arr) => {
+                            // Only show the first occurrence of each status in order
+                            if (arr.findIndex(evv => evv.status === ev.status) !== i) return null;
+                            return (
+                              <span key={ev.status} className={`w-3 h-3 rounded-full ${statusColors[ev.status] || 'bg-gray-200'}`} title={ev.status}></span>
+                            );
+                          })}
+                        </div>
                       </td>
                     </tr>
                   );

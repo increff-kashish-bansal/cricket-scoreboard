@@ -29,13 +29,13 @@ const navLinks = [
 function TopBar() {
   const { reload, loading, uploadTickets } = useTicketsContext();
   const fileInputRef = React.useRef();
-  const [csvFiles, setCsvFiles] = useState(["tickets.csv"]);
-  const [selectedCsv, setSelectedCsv] = useState("tickets.csv");
+  const [csvFiles, setCsvFiles] = useState(["ticket.csv"]);
+  const [selectedCsv, setSelectedCsv] = useState("ticket.csv");
 
   // Auto-detect CSV files in /public (simulate for now)
   useEffect(() => {
     // In a real app, you might fetch this from the server or a manifest
-    setCsvFiles(["tickets.csv"]); // Add more files if present
+    setCsvFiles(["ticket.csv"]); // Add more files if present
   }, []);
 
   // Allow user to select and load a CSV from the dropdown

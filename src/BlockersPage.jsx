@@ -38,6 +38,7 @@ export default function BlockersPage({ tickets = [], loading }) {
   const [blockerSearch, setBlockerSearch] = useState("");
   const [sprintFilter, setSprintFilter] = useState("");
   const [sortConfig, setSortConfig] = useState({ key: "totalHours", direction: "desc" });
+  const [activeTab, setActiveTab] = useState('clarification'); // 'clarification' or 'deprioritization'
 
   // Use tickets from props if provided, else load from CSV (legacy)
   const ticketsToUse = tickets.length ? tickets : ticketsState;
@@ -46,7 +47,7 @@ export default function BlockersPage({ tickets = [], loading }) {
   useEffect(() => {
     if (tickets.length) return; // skip if using props
     setLoading(true);
-    Papa.parse("/tickets.csv", {
+    Papa.parse("/ticket.csv", {
       download: true,
       header: true,
       skipEmptyLines: true,
@@ -211,233 +212,171 @@ export default function BlockersPage({ tickets = [], loading }) {
   // --- SUMMARY METRICS ---
   const totalTicketsBlocked = Object.values(blockerStats).reduce((acc, b) => acc + b.ticketIds.size, 0);
 
+  // --- Clarification Blockers Data ---
+  const clarificationTickets = ticketsToUse.filter(ticket => {
+    const log = ticket.eventLogParsed || [];
+    return log.length && log[log.length - 1].status === 'Blocked for Clarification';
+  });
+  // Aggregate by blocker entity for clarification
+  const clarificationStats = {};
+  clarificationTickets.forEach(ticket => {
+    const log = ticket.eventLogParsed || [];
+    const last = log[log.length - 1];
+    const entity = last && (last.blockedBy || last.by || last.user || ticket.blockedBy || 'Unknown');
+    if (!clarificationStats[entity]) clarificationStats[entity] = { entity, count: 0, totalHours: 0, tickets: [] };
+    // Duration in clarification
+    let clarStart = null;
+    for (let i = log.length - 1; i >= 0; i--) {
+      if (log[i].status === 'Blocked for Clarification') {
+        clarStart = log[i].timestamp;
+        break;
+      }
+    }
+    let clarHours = 0;
+    if (clarStart) {
+      clarHours = Math.max(1, Math.round((new Date() - new Date(clarStart)) / 36e5));
+    }
+    clarificationStats[entity].count++;
+    clarificationStats[entity].totalHours += clarHours;
+    clarificationStats[entity].tickets.push({ ...ticket, clarHours });
+  });
+  const clarificationTable = Object.values(clarificationStats).sort((a, b) => b.totalHours - a.totalHours);
+
+  // --- Deprioritization Events Data ---
+  // Find all tickets that have ever entered 'Deprioritized' state
+  const deprioritizedTickets = ticketsToUse.filter(ticket => (ticket.eventLogParsed || []).some(ev => ev.status === 'Deprioritized'));
+  // Sprints with most deprioritized tickets
+  const sprintDeprioritized = {};
+  deprioritizedTickets.forEach(ticket => {
+    const sprint = ticket.sprintName || ticket.sprint || 'No Sprint';
+    if (!sprintDeprioritized[sprint]) sprintDeprioritized[sprint] = 0;
+    sprintDeprioritized[sprint]++;
+  });
+  const sprintDeprioritizedData = Object.entries(sprintDeprioritized).map(([sprint, count]) => ({ sprint, count })).sort((a, b) => b.count - a.count);
+  // Most common reasons for deprioritization
+  const deprioritizeReasons = {};
+  deprioritizedTickets.forEach(ticket => {
+    const log = ticket.eventLogParsed || [];
+    log.forEach(ev => {
+      if (ev.status === 'Deprioritized' && ev.note) {
+        const reason = ev.note.trim() || 'Unspecified';
+        if (!deprioritizeReasons[reason]) deprioritizeReasons[reason] = 0;
+        deprioritizeReasons[reason]++;
+      }
+    });
+  });
+  const deprioritizeReasonsData = Object.entries(deprioritizeReasons).map(([reason, count]) => ({ reason, count })).sort((a, b) => b.count - a.count);
+  // Tickets most frequently deprioritized (by count of 'Deprioritized' events)
+  const ticketDeprioritizeCounts = deprioritizedTickets.map(ticket => {
+    const count = (ticket.eventLogParsed || []).filter(ev => ev.status === 'Deprioritized').length;
+    return { id: ticket.id, title: ticket.title, count };
+  }).sort((a, b) => b.count - a.count);
+
   return (
     <div>
-      <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Blocker Dashboard</h1>
-      {/* Blocked Hours Trend Line Chart */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-8">
-        <h2 className="text-lg font-semibold text-neutral-700 mb-2">Blocked Hours Trend (Last 8 Sprints)</h2>
-        <div className="w-full h-64">
-          <ResponsiveContainer>
-            <LineChart data={lineChartData} margin={{ top: 24, right: 32, left: 32, bottom: 24 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-              <XAxis dataKey="sprint" tick={{ fontSize: 14, fill: '#374151' }} />
-              <YAxis tick={{ fontSize: 14, fill: '#374151' }} label={{ value: 'Total Hours Blocked', angle: -90, position: 'insideLeft', fill: '#374151', fontSize: 14 }} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ background: '#f5f5f5', border: '1px solid #d1d5db', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
-                wrapperClassName="!z-50"
-                labelClassName="text-neutral-700"
-                itemStyle={{ color: '#374151' }}
-                formatter={(value) => `${value}h`}
-              />
-              <Legend
-                wrapperStyle={{ color: '#52525b', fontSize: 14, paddingBottom: 8 }}
-                iconType="circle"
-                align="right"
-                verticalAlign="top"
-                layout="horizontal"
-              />
-              <Line
-                type="monotone"
-                dataKey="totalBlocked"
-                stroke="#ef4444"
-                strokeWidth={3}
-                dot={{ r: 5, stroke: '#ef4444', strokeWidth: 2, fill: '#fff' }}
-                activeDot={{ r: 8, fill: '#ef4444', stroke: '#fff', strokeWidth: 2 }}
-                name="Total Hours Blocked"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="text-xs text-gray-500 mt-2">Shows whether the overall blocker situation is improving or worsening over time.</div>
+      <h1 className="text-2xl md:text-3xl font-bold text-neutral-800 mb-6">Blocker & Delay Analysis</h1>
+      {/* Tabs */}
+      <div className="flex gap-4 mb-6">
+        <button
+          className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${activeTab === 'clarification' ? 'border-primary text-primary bg-white' : 'border-transparent text-neutral-500 bg-neutral-100'}`}
+          onClick={() => setActiveTab('clarification')}
+        >
+          Clarification Blockers
+        </button>
+        <button
+          className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${activeTab === 'deprioritization' ? 'border-primary text-primary bg-white' : 'border-transparent text-neutral-500 bg-neutral-100'}`}
+          onClick={() => setActiveTab('deprioritization')}
+        >
+          Deprioritization Events
+        </button>
       </div>
-      {loadingToUse ? (
-        <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
-          <ArrowPathIcon className="h-10 w-10 animate-spin mb-2" />
-          <div>Loading data...</div>
+      {activeTab === 'clarification' ? (
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Tickets Blocked for Clarification</h2>
+          <div className="overflow-x-auto bg-white rounded shadow p-4 mb-8">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-neutral-100 text-left">
+                  <th className="px-4 py-2">Blocker Entity</th>
+                  <th className="px-4 py-2"># Tickets</th>
+                  <th className="px-4 py-2">Total Hours Blocked</th>
+                  <th className="px-4 py-2">Tickets</th>
+                </tr>
+              </thead>
+              <tbody>
+                {clarificationTable.length === 0 ? (
+                  <tr><td colSpan={4} className="text-center text-neutral-400 py-4">No clarification blockers found.</td></tr>
+                ) : clarificationTable.map(row => (
+                  <tr key={row.entity} className="border-t">
+                    <td className="px-4 py-2 font-mono">{row.entity}</td>
+                    <td className="px-4 py-2">{row.count}</td>
+                    <td className="px-4 py-2">{row.totalHours}</td>
+                    <td className="px-4 py-2">
+                      {row.tickets.map(t => (
+                        <span key={t.id} className="inline-block px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-xs font-mono mr-1 mb-1">{t.id} ({t.clarHours}h)</span>
+                      ))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       ) : (
-        <>
-          {/* SUMMARY CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-            <div className="flex flex-col items-center gap-2 bg-white rounded-xl shadow-md p-6 border border-neutral-200">
-              <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Total Blocked Time</div>
-              <div className="text-3xl font-bold text-neutral-800">{totalBlockedHours}h</div>
+        <div>
+          <h2 className="text-lg font-semibold mb-4">Deprioritization Events</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <div className="bg-white rounded shadow p-4">
+              <h3 className="font-semibold mb-2">Sprints with Most Deprioritized Tickets</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={sprintDeprioritizedData} layout="vertical" margin={{ left: 80, right: 24, top: 24, bottom: 24 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                  <XAxis type="number" allowDecimals={false} />
+                  <YAxis dataKey="sprint" type="category" width={80} />
+                  <Tooltip formatter={v => `${v} tickets`} />
+                  <Bar dataKey="count" fill="#fb923c" name="# Deprioritized" radius={[4, 4, 4, 4]} />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <div className="flex flex-col items-center gap-2 bg-white rounded-xl shadow-md p-6 border border-neutral-200">
-              <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Total Tickets Blocked</div>
-              <div className="text-3xl font-bold text-neutral-800">{totalTicketsBlocked}</div>
-            </div>
-          </div>
-          <div className="mb-8 bg-white rounded shadow p-4">
-            <div className="bg-neutral-100 rounded-lg shadow-sm p-6 mb-6">
-              <h2 className="text-xl font-semibold text-neutral-700 mb-4">Blockers by {barMode === 'time' ? 'Total Blocked Time' : '# Tickets Blocked'}</h2>
-              {barData.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
-                  <InformationCircleIcon className="h-10 w-10 mb-2" />
-                  <div>No blocker data available.</div>
-                </div>
-              ) : (
-                <>
-                  <div className="flex items-center gap-4 mb-2">
-                    <span className="font-semibold text-sm">Compare Blockers by:</span>
-                    <button
-                      className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${barMode === "time" ? "border-primary text-primary bg-white" : "border-transparent text-neutral-500 bg-neutral-100"}`}
-                      onClick={() => setBarMode("time")}
-                    >
-                      Total Blocked Time
-                    </button>
-                    <button
-                      className={`px-4 py-2 rounded-t-lg font-semibold border-b-2 transition-all ${barMode === "count" ? "border-primary text-primary bg-white" : "border-transparent text-neutral-500 bg-neutral-100"}`}
-                      onClick={() => setBarMode("count")}
-                    >
-                      # Tickets Blocked
-                    </button>
-                  </div>
-                  <div className="w-full h-64">
-                    <ResponsiveContainer>
-                      <BarChart
-                        data={barData}
-                        layout="vertical"
-                        margin={{ left: 120, right: 24, top: 24, bottom: 24 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke={"#e5e7eb"} />
-                        <XAxis
-                          type="number"
-                          allowDecimals={false}
-                          label={{
-                            value: barMode === "time" ? "Total Blocked Time (h)" : "# Tickets Blocked",
-                            position: "insideBottomRight",
-                            offset: -5,
-                          }}
-                          tickLine={{ stroke: '#a3a3a3' }}
-                          axisLine={{ stroke: '#a3a3a3' }}
-                        />
-                        <YAxis
-                          dataKey="name"
-                          type="category"
-                          width={120}
-                          tickLine={{ stroke: '#a3a3a3' }}
-                          axisLine={{ stroke: '#a3a3a3' }}
-                          tick={{ className: 'text-neutral-700 text-sm' }}
-                        />
-                        <Tooltip
-                          contentStyle={{ background: '#f5f5f5', border: '1px solid #d4d4d4', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.04)', padding: 12, color: '#374151', fontSize: 14 }}
-                          wrapperClassName="!z-50"
-                          labelClassName="text-neutral-700"
-                          itemStyle={{ color: '#374151' }}
-                          formatter={(value) =>
-                            barMode === "time"
-                              ? `${value}h`
-                              : `${value} ticket${value === 1 ? "" : "s"}`
-                          }
-                        />
-                        <Legend wrapperStyle={{ color: '#52525b' }} iconType="circle" />
-                        <Bar
-                          dataKey={barMode === "time" ? "value" : "count"}
-                          fill={barMode === "time" ? "#22c55e" : "#3b82f6"}
-                          name={barMode === "time" ? "Total Blocked Time (h)" : "# Tickets Blocked"}
-                          radius={[4, 4, 4, 4]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </>
-              )}
-              {selectedBlocker && (
-                <div className="mt-2 flex items-center gap-2">
-                  <span className="text-sm">Filtering for:</span>
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-200">{selectedBlocker}</span>
-                  <button
-                    className="bg-transparent text-primary border border-primary px-3 py-1 rounded-md hover:bg-primary-light hover:text-white transition-all ml-2 text-xs"
-                    onClick={() => setSelectedBlocker(null)}
-                  >
-                    Reset Filter
-                  </button>
-                </div>
-              )}
+            <div className="bg-white rounded shadow p-4">
+              <h3 className="font-semibold mb-2">Most Common Reasons for Deprioritization</h3>
+              <ResponsiveContainer width="100%" height={220}>
+                <PieChart>
+                  <Pie data={deprioritizeReasonsData} dataKey="count" nameKey="reason" cx="50%" cy="50%" outerRadius={70} label={({ name, percent }) => `${name} (${Math.round(percent * 100)}%)`}>
+                    {deprioritizeReasonsData.map((entry, idx) => (
+                      <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value, name) => [`${value} tickets`, name]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
           </div>
           <div className="bg-white rounded shadow p-4">
-            <div className="bg-neutral-100 rounded-lg shadow-sm p-4 mb-6">
-              <div className="flex flex-wrap gap-4 items-end mb-4">
-                <div className="flex-1 min-w-[200px]">
-                  <label className="block text-sm font-medium text-neutral-600 mb-1">Search Blocker</label>
-                  <input
-                    type="text"
-                    className="border border-neutral-300 rounded-md px-3 py-2 w-full text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                    placeholder="Search by blocker name"
-                    value={blockerSearch}
-                    onChange={e => setBlockerSearch(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-neutral-600 mb-1">Sprint</label>
-                  <select
-                    className="border border-neutral-300 rounded-md px-3 py-2 w-full text-neutral-700 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
-                    value={sprintFilter}
-                    onChange={e => setSprintFilter(e.target.value)}
-                  >
-                    <option value="">All</option>
-                    {allSprints.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-xl font-semibold text-neutral-700">Blocker Table</h2>
-                <button onClick={handleExport} className="bg-primary text-white px-4 py-2 rounded-md hover:bg-primary-dark focus:ring-2 focus:ring-primary focus:ring-opacity-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed">Export CSV</button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr className="bg-neutral-100 text-left">
-                      <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("entity")}>Blocker Entity {sortConfig.key === "entity" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
-                      <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("count")}># Tickets Blocked {sortConfig.key === "count" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
-                      <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("totalHours")}>Total Time Blocked (h) {sortConfig.key === "totalHours" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
-                      <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("avgHours")}>Avg Block Duration (h) {sortConfig.key === "avgHours" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
-                      <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("maxHours")}>Longest Block (h) {sortConfig.key === "maxHours" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
-                      <th className="px-4 py-2 cursor-pointer select-none" onClick={() => handleSort("mostRecentDate")}>Most Recent Blocked Ticket {sortConfig.key === "mostRecentDate" && (sortConfig.direction === "asc" ? "▲" : "▼")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableData.length === 0 ? (
-                      <tr>
-                        <td colSpan={6}>
-                          <div className="flex flex-col items-center justify-center p-8 text-neutral-500">
-                            <InformationCircleIcon className="h-8 w-8 mb-2" />
-                            <div>No blocker data available.</div>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      tableData.map(b => (
-                        <tr key={b.entity} className="border-t hover:bg-neutral-50">
-                          <td className="px-4 py-2 font-mono flex items-center gap-2">
-                            {b.entity}
-                            {b.repeatOffender && (
-                              <span className="inline-block px-2 py-0.5 rounded-full bg-red-100 text-red-800 text-xs font-semibold border border-red-200" title="Repeat Offender">Repeat Offender</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-2">{b.count}</td>
-                          <td className="px-4 py-2">{b.totalHours}</td>
-                          <td className="px-4 py-2">{b.avgHours}</td>
-                          <td className="px-4 py-2">{b.maxHours}</td>
-                          <td className="px-4 py-2">
-                            {b.mostRecent ? (
-                              <Link to={`/tickets/${b.mostRecent.id}`} className="text-blue-600 hover:underline font-mono">{b.mostRecent.id}</Link>
-                            ) : "-"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <h3 className="font-semibold mb-2">Tickets Most Frequently Deprioritized</h3>
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="bg-neutral-100 text-left">
+                  <th className="px-4 py-2">Ticket ID</th>
+                  <th className="px-4 py-2">Title</th>
+                  <th className="px-4 py-2"># Times Deprioritized</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ticketDeprioritizeCounts.length === 0 ? (
+                  <tr><td colSpan={3} className="text-center text-neutral-400 py-4">No deprioritization events found.</td></tr>
+                ) : ticketDeprioritizeCounts.map(row => (
+                  <tr key={row.id} className="border-t">
+                    <td className="px-4 py-2 font-mono">{row.id}</td>
+                    <td className="px-4 py-2">{row.title}</td>
+                    <td className="px-4 py-2">{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

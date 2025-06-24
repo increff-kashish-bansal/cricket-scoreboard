@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/solid';
 import { formatHoursToDuration, formatDate as formatDateForDisplay } from './utils.js';
-import { Gantt, ViewMode } from 'gantt-task-react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import 'gantt-task-react/dist/index.css';
 
 // Helper: get initials from name
@@ -43,6 +43,107 @@ const statusPillClass = status => {
   }
 };
 
+// Add statusColors for timeline dots
+const statusColors = {
+  'Created': 'bg-gray-400',
+  'Tech Review': 'bg-blue-400',
+  'Blocked for Clarification': 'bg-yellow-400',
+  'In Sprint Backlog': 'bg-purple-400',
+  'In Development': 'bg-blue-600',
+  'Tech QC': 'bg-green-400',
+  'Business QC': 'bg-green-600',
+  'Deprioritized': 'bg-orange-400',
+  'Released': 'bg-green-800',
+};
+
+// Add LifecycleTimeline component
+function LifecycleTimeline({ eventLogParsed }) {
+  if (!eventLogParsed || eventLogParsed.length === 0) return <div className="text-neutral-400 italic">No event log available.</div>;
+  // Build timeline entries
+  const entries = [];
+  for (let i = 0; i < eventLogParsed.length; i++) {
+    const ev = eventLogParsed[i];
+    const prev = eventLogParsed[i - 1];
+    let duration = null;
+    if (prev && prev.timestamp && ev.timestamp) {
+      duration = Math.round((new Date(ev.timestamp) - new Date(prev.timestamp)) / 36e5); // hours
+    }
+    entries.push({
+      status: ev.status,
+      by: ev.user || ev.by || ev.owner || '?',
+      timestamp: ev.timestamp,
+      duration,
+      idx: i
+    });
+  }
+  return (
+    <div className="flex flex-col gap-4">
+      {entries.map((entry, idx) => (
+        <div key={idx} className="flex items-start gap-3">
+          <div className="flex flex-col items-center">
+            <span className={`w-4 h-4 rounded-full ${statusColors[entry.status] || 'bg-gray-300'}`}></span>
+            {idx < entries.length - 1 && <span className="w-1 h-8 bg-neutral-300 mx-auto"></span>}
+          </div>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <span className="font-semibold text-neutral-800">{entry.status}</span>
+              <span className="text-xs text-neutral-500">{entry.timestamp ? formatDateForDisplay(entry.timestamp) : '-'}</span>
+            </div>
+            <div className="text-xs text-neutral-500">
+              By: <span className="font-mono">{entry.by}</span>
+              {entry.duration != null && idx > 0 && (
+                <span className="ml-2">(Spent {entry.duration}h in previous state)</span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// State Duration Summary Panel
+function StateDurationSummary({ ticket }) {
+  // Use the granular time properties from the ticket
+  const stateTimes = [
+    { name: 'Created', value: ticket.timeInCreatedHours },
+    { name: 'Tech Review', value: ticket.timeInTechReviewHours },
+    { name: 'Clarification', value: ticket.timeInClarificationHours },
+    { name: 'Sprint Backlog', value: ticket.timeInSprintBacklogHours },
+    { name: 'Development', value: ticket.timeInDevelopmentHours },
+    { name: 'Tech QC', value: ticket.timeInTechQCHours },
+    { name: 'Business QC', value: ticket.timeInBusinessQCHours },
+    { name: 'Deprioritized', value: ticket.timeDeprioritizedHours },
+    { name: 'Released', value: ticket.timeInReleasedHours },
+  ].filter(s => typeof s.value === 'number' && s.value > 0);
+  const COLORS = ['#a3a3a3', '#60a5fa', '#facc15', '#a78bfa', '#2563eb', '#34d399', '#059669', '#fb923c', '#166534'];
+  if (stateTimes.length === 0) return <div className="text-neutral-400 italic">No state duration data.</div>;
+  return (
+    <div className="w-full max-w-xs">
+      <ResponsiveContainer width="100%" height={220}>
+        <PieChart>
+          <Pie
+            data={stateTimes}
+            dataKey="value"
+            nameKey="name"
+            cx="50%"
+            cy="50%"
+            outerRadius={70}
+            label={({ name, percent }) => `${name} (${Math.round(percent * 100)}%)`}
+          >
+            {stateTimes.map((entry, idx) => (
+              <Cell key={`cell-${idx}`} fill={COLORS[idx % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value, name) => [`${value}h`, name]} />
+          <Legend />
+        </PieChart>
+      </ResponsiveContainer>
+      <div className="mt-2 text-xs text-neutral-500">Total time spent in each state (hours).</div>
+    </div>
+  );
+}
+
 export default function TicketDetailPage({ tickets = [], loading }) {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -51,119 +152,6 @@ export default function TicketDetailPage({ tickets = [], loading }) {
 
   // --- DYNAMIC DATA DERIVATION FROM eventLogParsed ---
   const eventLogParsed = ticket.eventLogParsed || [];
-
-  // Gantt Task Transformation
-  function transformEventLogToGanttTasks(eventLogParsed, ticketDetails) {
-    const statusColors = {
-      'To Do': '#2563eb',
-      'Backlog': '#64748b',
-      'In Progress': '#f59e42',
-      'In Review': '#a21caf',
-      'QA': '#059669',
-      'Blocked': '#dc2626',
-      'Done': '#22c55e',
-      'Deployed': '#0ea5e9',
-      'Unblocked': '#22c55e',
-      'default': '#bdbdbd',
-    };
-    const blockedBarFill = '#991B1B';
-    const criticalBlockerFill = '#ff1744'; // Brighter red
-    const tasks = [];
-    const blockedTasks = [];
-    for (let i = 0; i < eventLogParsed.length; i++) {
-      const ev = eventLogParsed[i];
-      if (!ev.status || !ev.timestamp) continue;
-      const start = ev.timestamp;
-      let end = null;
-      if (i < eventLogParsed.length - 1) {
-        end = eventLogParsed[i + 1].timestamp;
-      } else {
-        end = (ticketDetails.status === 'Done' || ticketDetails.status === 'Deployed') ? null : new Date();
-      }
-      if (!start || isNaN(start.getTime())) continue;
-      if (end && (isNaN(end.getTime()) || end <= start)) continue;
-      const phaseStatus = ev.status;
-      const color = statusColors[phaseStatus] || statusColors['default'];
-      const ganttEnd = end || new Date();
-      
-      // Debug logging
-      console.log(`Processing status: ${phaseStatus}, color: ${color}`);
-      
-      // Concise name for bar
-      let name = phaseStatus;
-      
-      // Calculate duration (ms) for blocked phases
-      let durationMs = null;
-      if (phaseStatus === 'Blocked') {
-        durationMs = new Date(ganttEnd) - new Date(start);
-      }
-      
-      // Use the library's built-in color properties
-      const task = {
-        id: `${ticketDetails.id}-${i}-${phaseStatus}`,
-        name,
-        start: start,
-        end: ganttEnd,
-        type: 'task',
-        progress: end ? 100 : 0,
-        dependencies: [],
-        backgroundColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
-        barColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
-        barProgressColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
-        progressColor: phaseStatus === 'Blocked' ? blockedBarFill : color,
-        blockedBy: ev.blockedBy,
-        user: ev.user,
-        reason: ev.reason || ev.note,
-        // For critical detection
-        durationMs,
-      };
-      
-      if (phaseStatus === 'Blocked') blockedTasks.push({ idx: tasks.length, durationMs: durationMs || 0 });
-      tasks.push(task);
-    }
-    // Find the blocked task with the max duration
-    if (blockedTasks.length > 0) {
-      const maxIdx = blockedTasks.reduce((maxI, t, i, arr) => t.durationMs > arr[maxI].durationMs ? i : maxI, 0);
-      const criticalIdx = blockedTasks[maxIdx].idx;
-      if (tasks[criticalIdx]) {
-        tasks[criticalIdx].isCriticalBlocker = true;
-        // Brighter red and glowing effect
-        tasks[criticalIdx].backgroundColor = criticalBlockerFill;
-        tasks[criticalIdx].barColor = criticalBlockerFill;
-        tasks[criticalIdx].barProgressColor = criticalBlockerFill;
-        tasks[criticalIdx].progressColor = criticalBlockerFill;
-        tasks[criticalIdx].customClass = 'gantt-critical-blocker';
-      }
-    }
-    return tasks;
-  }
-
-  // Compute Gantt tasks for this ticket
-  const ganttTasks = transformEventLogToGanttTasks(eventLogParsed, ticket);
-  
-  // Debug: Log all unique statuses found
-  const uniqueStatuses = [...new Set(eventLogParsed.map(ev => ev.status).filter(Boolean))];
-  console.log('Unique statuses found:', uniqueStatuses);
-  console.log('Event log parsed:', eventLogParsed);
-  
-  // Fallback: if no tasks were created, create a default task
-  if (ganttTasks.length === 0) {
-    const now = new Date();
-    const createdDate = ticket.Created_On_Date || now;
-    ganttTasks.push({
-      id: `${ticket.id}-default`,
-      name: `Ticket ${ticket.status || 'Unknown'}`,
-      start: createdDate,
-      end: now,
-      type: 'task',
-      progress: 100,
-      dependencies: [],
-      styles: { backgroundColor: '#a3a3a3', borderColor: '#a3a3a3' },
-    });
-  }
-  
-  // Debug logging
-  console.log('Gantt tasks:', ganttTasks);
 
   // 4.1 Build statusHistory
   const statusHistory = (() => {
@@ -304,57 +292,6 @@ export default function TicketDetailPage({ tickets = [], loading }) {
   const cycleH = ticket.totalCycleTimeHours;
   const percentBlocked = (cycleH && blockedH != null) ? Math.round((blockedH / cycleH) * 100) : null;
 
-  const [viewMode, setViewMode] = useState(ViewMode.Day);
-  const [selectedTaskId, setSelectedTaskId] = useState(null);
-  const [taskDetail, setTaskDetail] = useState(null);
-
-  const ganttContainerRef = useRef(null);
-
-  // Custom Today Line Overlay
-  useEffect(() => {
-    const container = ganttContainerRef.current;
-    if (!container) return;
-    // Remove any previous today lines
-    const prev = container.querySelector('.gantt-today-line');
-    if (prev) prev.remove();
-    // Find the Gantt chart svg
-    const svg = container.querySelector('svg');
-    if (!svg) return;
-    // Find the leftmost and rightmost x positions
-    const chartArea = svg.querySelector('g[data-testid="horizontal-lines"]');
-    if (!chartArea) return;
-    // Find the time scale (x axis) group
-    const xAxis = svg.querySelector('g[data-testid="date-labels"]');
-    if (!xAxis) return;
-    // Find the first and last date label positions
-    const labels = xAxis.querySelectorAll('text');
-    if (!labels.length) return;
-    // Get the bounding box for the chart area
-    const chartBox = chartArea.getBBox();
-    // Calculate the X position for today
-    const now = new Date();
-    // Find the min and max date from the tasks
-    const allDates = ganttTasks.flatMap(t => [t.start, t.end]).filter(Boolean);
-    const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
-    const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
-    if (now < minDate || now > maxDate) return; // Don't draw if out of range
-    const totalMs = maxDate - minDate;
-    const nowMs = now - minDate;
-    const percent = nowMs / totalMs;
-    const x = chartBox.x + chartBox.width * percent;
-    // Draw the today line
-    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-    line.setAttribute('x1', x);
-    line.setAttribute('x2', x);
-    line.setAttribute('y1', chartBox.y);
-    line.setAttribute('y2', chartBox.y + chartBox.height);
-    line.setAttribute('stroke', '#3B82F6');
-    line.setAttribute('stroke-width', '2');
-    line.setAttribute('stroke-dasharray', '4 2');
-    line.setAttribute('class', 'gantt-today-line');
-    svg.appendChild(line);
-  }, [ganttTasks, viewMode]);
-
   // Interactivity handlers
   function handleDateChange(task, newStart, newEnd) {
     // For now, just log or ignore (could update state if you want editable Gantt)
@@ -385,8 +322,6 @@ export default function TicketDetailPage({ tickets = [], loading }) {
 
   // Enhanced onTaskClick handler
   function handleTaskClick(task) {
-    setSelectedTaskId(task.id);
-    setTaskDetail(task);
     // Interactive linking: scroll to and highlight log entry
     if (task.name === 'Blocked') {
       // Find matching Blocker Log entry by start/end
@@ -420,7 +355,23 @@ export default function TicketDetailPage({ tickets = [], loading }) {
   }
 
   return (
-    <div className="max-w-screen-xl mx-auto px-4 md:px-8 space-y-12">
+    <div className="max-w-5xl mx-auto p-4">
+      <div className="mb-4 flex items-center gap-4">
+        <button onClick={() => navigate(-1)} className="text-primary hover:underline flex items-center gap-1"><ArrowLeftIcon className="w-5 h-5" />Back</button>
+        <h1 className="text-2xl font-bold text-neutral-800">Ticket #{ticket.id}</h1>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {/* Main Timeline */}
+        <div className="md:col-span-2">
+          <h2 className="text-lg font-semibold mb-2">Lifecycle Timeline</h2>
+          <LifecycleTimeline eventLogParsed={eventLogParsed} />
+        </div>
+        {/* State Duration Summary */}
+        <div>
+          <h2 className="text-lg font-semibold mb-2">State Duration Summary</h2>
+          <StateDurationSummary ticket={ticket} />
+        </div>
+      </div>
       {/* Top Header with Navigation */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-baseline gap-3">
@@ -487,103 +438,6 @@ export default function TicketDetailPage({ tickets = [], loading }) {
             <div className="text-sm text-neutral-500 uppercase tracking-wide">% Time Blocked</div>
           </div>
         </div>
-      </div>
-      {/* Gantt Chart Section */}
-      <div className="bg-neutral-100 rounded-lg shadow-sm p-8 mb-8 overflow-x-auto" ref={ganttContainerRef}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-          <h2 className="text-xl font-semibold text-neutral-700 mb-4">Status Timeline (Gantt)</h2>
-          <div className="flex items-center gap-2">
-            <label className="font-medium text-neutral-600" htmlFor="viewMode">View Mode:</label>
-            <select
-              id="viewMode"
-              className="border border-neutral-300 rounded-md px-3 py-2 text-neutral-700"
-              value={viewMode}
-              onChange={e => setViewMode(e.target.value)}
-            >
-              <option value={ViewMode.Day}>Day</option>
-              <option value={ViewMode.Week}>Week</option>
-              <option value={ViewMode.Month}>Month</option>
-            </select>
-            <span className="ml-4 flex items-center gap-1 text-xs text-blue-600"><span className="inline-block w-3 h-3 rounded-full bg-blue-500 border border-blue-700" style={{borderRadius:2, borderWidth:2}}></span> Today</span>
-          </div>
-        </div>
-        {/* Color Legend */}
-        <div className="flex flex-wrap gap-4 mb-4">
-          {Object.entries({
-            'To Do': '#2563eb',
-            'In Progress': '#f59e42',
-            'Blocked': '#dc2626',
-            'Done': '#22c55e',
-            'QA': '#059669',
-            'In Review': '#a21caf',
-            'Deployed': '#0ea5e9',
-          }).map(([status, color]) => (
-            <div key={status} className="flex items-center gap-2">
-              <span className="inline-block w-4 h-4 rounded" style={{background: color, border: '2px solid #222'}}></span>
-              <span className="text-sm text-neutral-700">{status}</span>
-            </div>
-          ))}
-        </div>
-        <div style={{ background: '#fff', borderRadius: 8, padding: 8, minWidth: 600, overflowX: 'auto' }}>
-          <style>{`
-            .gantt-critical-blocker-bar {
-              filter: drop-shadow(0 0 8px #ff1744) drop-shadow(0 0 16px #ff1744);
-              animation: glowCriticalBlocker 1.2s infinite alternate;
-            }
-            @keyframes glowCriticalBlocker {
-              0% { filter: drop-shadow(0 0 8px #ff1744); }
-              100% { filter: drop-shadow(0 0 20px #ff1744); }
-            }
-          `}</style>
-          <Gantt
-            tasks={ganttTasks}
-            viewMode={viewMode}
-            fontFamily="Inter, system-ui, sans-serif"
-            fontSize={16}
-            barHeight={52}
-            columnWidth={viewMode === ViewMode.Day ? 80 : viewMode === ViewMode.Week ? 120 : 180}
-            listCellWidth={0}
-            barCornerRadius={6}
-            onDateChange={handleDateChange}
-            onTaskClick={handleTaskClick}
-            onExpanderClick={handleTaskClick}
-            TooltipContent={({ task }) => {
-              const durationH = task.start && task.end ? Math.round((new Date(task.end) - new Date(task.start)) / 36e5) : null;
-              return (
-                <div style={{ padding: 16, fontSize: 15, minWidth: 260, background: 'rgba(255,255,255,0.98)', borderRadius: 8, boxShadow: '0 2px 8px 0 rgba(0,0,0,0.08)', color: '#1e293b' }}>
-                  <div className="font-bold mb-1" style={{fontSize: 17, fontWeight: 700, color: '#0f172a'}} title={task.name}>{task.name}</div>
-                  <div className="text-xs text-neutral-500 mb-1">{task.user && `By: ${task.user}`}</div>
-                  <div><span className="text-neutral-500">Start:</span> {task.start ? new Date(task.start).toLocaleString() : '-'}</div>
-                  <div><span className="text-neutral-500">End:</span> {task.end ? new Date(task.end).toLocaleString() : 'now'}</div>
-                  <div><span className="text-neutral-500">Duration:</span> {durationH != null ? durationH + 'h' : '-'}</div>
-                  {task.name.toLowerCase().includes('blocked') && (
-                    <>
-                      <div className="mt-2 text-red-700 font-semibold">Blocked By: {task.blockedBy || task.user || '?'}</div>
-                      {task.reason && <div className="mt-1 text-xs text-neutral-700 bg-yellow-50 rounded p-2">Reason: {task.reason}</div>}
-                    </>
-                  )}
-                  {task.isCriticalBlocker && (
-                    <div className="mt-2 p-2 rounded bg-red-100 border border-red-300 text-red-900 font-bold text-sm flex items-center gap-2">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff1744" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                      Longest Blocker Phase
-                    </div>
-                  )}
-                </div>
-              );
-            }}
-            barClassName={task => task.isCriticalBlocker ? 'gantt-critical-blocker-bar' : ''}
-          />
-        </div>
-        {/* Show details for selected phase */}
-        {taskDetail && (
-          <div className="mt-4 p-4 bg-white rounded shadow border border-primary-light">
-            <div className="font-bold text-primary mb-2">Phase Details</div>
-            <div><b>Name:</b> {taskDetail.name}</div>
-            <div><b>Start:</b> {taskDetail.start ? new Date(taskDetail.start).toLocaleString() : '-'}</div>
-            <div><b>End:</b> {taskDetail.end ? new Date(taskDetail.end).toLocaleString() : 'now'}</div>
-            <div><b>Status:</b> {taskDetail.type}</div>
-          </div>
-        )}
       </div>
       {/* Blocker Log */}
       <div className="bg-white rounded-xl shadow-md p-8 mb-8">

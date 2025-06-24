@@ -269,6 +269,12 @@ function Dashboard() {
     saveLayout(newLayout);
   };
 
+  // --- New KPI Calculations for granular lifecycle ---
+  // Blocked (Clarification): tickets currently in 'Blocked for Clarification'
+  const blockedClarificationCount = tickets.filter(t => t.eventLogParsed && t.eventLogParsed.length && t.eventLogParsed[t.eventLogParsed.length-1].status === 'Blocked for Clarification').length;
+  // Deprioritized: tickets currently in 'Deprioritized'
+  const deprioritizedCount = tickets.filter(t => t.eventLogParsed && t.eventLogParsed.length && t.eventLogParsed[t.eventLogParsed.length-1].status === 'Deprioritized').length;
+
   return (
     <div className="min-h-screen bg-neutral-50 p-4">
       <div className="mb-4 flex items-center justify-between">
@@ -318,29 +324,17 @@ function Dashboard() {
                 <div className="text-3xl font-bold text-neutral-800">{totalTickets}</div>
                 <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide">Total Tickets</div>
               </div>
-              {/* Blocked This Sprint */}
+              {/* Blocked (Clarification) */}
               <div className="flex flex-col items-center justify-center gap-3 bg-neutral-50 rounded-lg p-4">
-                <ExclamationCircleIcon className="w-8 h-8 text-status-in-progress mb-2" />
-                <div className="text-3xl font-bold text-neutral-800">{blockedThisSprint}</div>
-                <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide text-center">Blocked This Sprint</div>
+                <ExclamationCircleIcon className="w-8 h-8 text-yellow-500 mb-2" />
+                <div className="text-3xl font-bold text-neutral-800">{blockedClarificationCount}</div>
+                <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide text-center">Blocked (Clarification)</div>
               </div>
-              {/* Top 3 Blockers + View All */}
+              {/* Deprioritized */}
               <div className="flex flex-col items-center justify-center gap-3 bg-neutral-50 rounded-lg p-4">
-                <FireIcon className="w-8 h-8 text-status-blocked mb-2" />
-                <div className="text-lg font-bold mb-1 flex items-center gap-2">Top 3 Blockers
-                  <button className="ml-2 text-xs text-primary underline hover:text-primary-dark" onClick={() => setModal('blockers')}>View All</button>
-                </div>
-                <ul className="text-xs text-gray-700">
-                  {topBlockers.length === 0 ? <li>None</li> : topBlockers.map(([name, stat]) => (
-                    <li key={name} className="flex flex-col gap-0.5 mb-1">
-                      <span className="flex items-center gap-2">
-                        <span>{name}</span>
-                        <span className="text-gray-400">({stat.count})</span>
-                      </span>
-                      <span className="ml-2 text-green-700">Avg Blocked: {stat.count ? Math.round(stat.totalBlocked / stat.count) + 'h' : '-'}</span>
-                    </li>
-                  ))}
-                </ul>
+                <ArrowPathIcon className="w-8 h-8 text-gray-500 mb-2" />
+                <div className="text-3xl font-bold text-neutral-800">{deprioritizedCount}</div>
+                <div className="text-xs text-neutral-500 font-semibold uppercase tracking-wide text-center">Deprioritized</div>
               </div>
               {/* Avg Time to Close */}
               <div className="flex flex-col items-center justify-center gap-3 bg-neutral-50 rounded-lg p-4">
@@ -599,7 +593,6 @@ function Dashboard() {
                 {sprintGanttTasks.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-neutral-400 py-12">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <div>No valid sprint data to display Gantt chart.</div>
                   </div>
                 ) : (
                   <Gantt
@@ -732,6 +725,16 @@ function Dashboard() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+        {/* Add Lifecycle Funnel/Sankey Chart */}
+        <div key="lifecycle-funnel" className="bg-white rounded-lg shadow-sm border border-neutral-200 h-full flex flex-col">
+          <div className="widget-drag-handle bg-neutral-50 px-4 py-2 border-b border-neutral-200 cursor-move flex-shrink-0">
+            <h3 className="font-semibold text-neutral-700">Ticket Lifecycle Funnel</h3>
+          </div>
+          <div className="p-4 flex-1 flex items-center justify-center">
+            {/* TODO: Implement LifecycleFunnelChart component */}
+            <div className="text-neutral-400">Lifecycle funnel or Sankey chart coming soon...</div>
           </div>
         </div>
       </ResponsiveGridLayout>
